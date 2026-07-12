@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Overtime Report Generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Sinhala:wght@400;500;600;700&family=Noto+Sans+Tamil:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0F5C56">
+<meta name="description" content="Track office and WFH/online overtime, apply OT limits, and generate PDF/Excel reports.">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="OT Report">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ===== TOP BAR ===== -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 48 48" width="30" height="30">
+          <circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" stroke-width="3.2"/>
+          <path d="M24 13v11l8 5" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M24 4a20 20 0 0 1 14.1 5.9" fill="none" stroke="var(--accent-2)" stroke-width="3.2" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <div class="brand-text">
+        <h1 data-i18n="appTitle">Overtime Report Generator</h1>
+        <span class="brand-sub" data-i18n="appSub">Government &amp; institutional OT tracking</span>
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <div class="save-indicator" id="saveIndicator">
+        <span class="dot" id="saveDot"></span>
+        <span id="saveText" data-i18n="savedJustNow">Saved just now</span>
+      </div>
+
+      <div class="lang-switch">
+        <select id="langSelect" aria-label="Language">
+          <option value="en">English</option>
+          <option value="si">සිංහල</option>
+          <option value="ta">தமிழ்</option>
+        </select>
+      </div>
+
+      <button class="icon-btn" id="themeToggle" aria-label="Toggle theme" title="Toggle theme">
+        <svg class="icon-sun" viewBox="0 0 24 24" width="19" height="19"><circle cx="12" cy="12" r="4.6" fill="none" stroke="currentColor" stroke-width="1.8"/><g stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="12" y1="1.6" x2="12" y2="4.4"/><line x1="12" y1="19.6" x2="12" y2="22.4"/><line x1="1.6" y1="12" x2="4.4" y2="12"/><line x1="19.6" y1="12" x2="22.4" y2="12"/><line x1="4.4" y1="4.4" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.6" y2="19.6"/><line x1="4.4" y1="19.6" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.6" y2="4.4"/></g></svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" width="19" height="19"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" fill="currentColor"/></svg>
+      </button>
+
+      <button class="icon-btn" id="settingsBtn" data-i18n-title="settings" title="Settings" aria-label="Settings">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4.7a7.7 7.7 0 0 0-1.7-1L14.8 3h-3.6l-.5 2.7a7.7 7.7 0 0 0-1.7 1l-2.4-.7-2 3.4L6.6 11a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-.7a7.7 7.7 0 0 0 1.7 1l.5 2.7h3.6l.5-2.7a7.7 7.7 0 0 0 1.7-1l2.4.7 2-3.4Z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ===== MAIN LAYOUT ===== -->
+<main class="app-shell">
+
+  <!-- Month navigation + summary -->
+  <section class="month-bar">
+    <div class="month-nav">
+      <button class="nav-btn" id="prevMonth" aria-label="Previous month">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="month-label" id="monthLabel">July 2026</div>
+      <button class="nav-btn" id="nextMonth" aria-label="Next month">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+      </button>
+      <button class="today-btn" id="todayBtn" data-i18n="today">Today</button>
+    </div>
+
+    <div class="period-switch">
+      <div class="segmented period-mode-segment" id="periodModeSegment">
+        <button type="button" data-mode="month" class="seg-btn active" data-i18n="thisMonth">This month</button>
+        <button type="button" data-mode="custom" class="seg-btn" data-i18n="customPeriod">Custom period</button>
+      </div>
+      <div class="period-range" id="periodRangeInputs" hidden>
+        <input type="date" id="periodStartInput" class="date-input">
+        <span>–</span>
+        <input type="date" id="periodEndInput" class="date-input">
+      </div>
+      <span class="period-label" id="periodLabel"></span>
+    </div>
+
+    <div class="summary-strip" id="summaryStrip">
+      <div class="summary-chip chip-total">
+        <span class="chip-val" id="sumTotalHours">0h 00m</span>
+        <span class="chip-label" data-i18n="totalOt">Total OT</span>
+      </div>
+      <div class="summary-chip">
+        <span class="chip-val" id="sumWeekdayHours">0h 00m</span>
+        <span class="chip-label" data-i18n="weekdayOt">Weekday OT</span>
+      </div>
+      <div class="summary-chip">
+        <span class="chip-val" id="sumWeekendHours">0h 00m</span>
+        <span class="chip-label" data-i18n="weekendOt">Weekend/Holiday OT</span>
+      </div>
+      <div class="summary-chip">
+        <span class="chip-val" id="sumWfhHours">0h 00m</span>
+        <span class="chip-label" data-i18n="wfhOt">Online/WFH OT</span>
+      </div>
+      <div class="summary-chip chip-pay">
+        <span class="chip-val" id="sumPay">LKR 0.00</span>
+        <span class="chip-label" data-i18n="estPay">Estimated Payment</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Calendar -->
+  <section class="calendar-card">
+    <div class="calendar-weekdays" id="calendarWeekdays"></div>
+    <div class="calendar-grid" id="calendarGrid"></div>
+  </section>
+
+  <!-- Actions row -->
+  <section class="actions-row">
+    <button class="btn btn-ghost" id="importJsonBtn">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+      <span>Import saved report</span>
+    </button>
+    <button class="btn btn-outline" id="quickFillBtn">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+      <span data-i18n="quickFill">Quick-fill weekdays</span>
+    </button>
+    <input type="file" id="importJsonInput" accept="application/json" hidden>
+
+    <div class="spacer"></div>
+
+    <button class="btn btn-outline" id="exportJsonBtn">
+      <span>Backup (.json)</span>
+    </button>
+    <button class="btn btn-outline" id="exportExcelBtn">
+      <span>Excel (.xlsx)</span>
+    </button>
+
+    <div class="more-reports-wrap">
+      <button class="btn btn-outline" id="moreReportsBtn" type="button">
+        <span data-i18n="moreReports">More reports</span>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="more-reports-menu" id="moreReportsMenu">
+        <button type="button" class="more-reports-item" id="exportLimitSplitBtn">
+          <span data-i18n="splitReportBtn">OT Limit Split Report</span>
+        </button>
+        <button type="button" class="more-reports-item" id="exportOfficeOnlyBtn">
+          <span data-i18n="officeReportBtn">Office OT Only</span>
+        </button>
+        <button type="button" class="more-reports-item" id="exportWfhOnlyBtn">
+          <span data-i18n="wfhReportBtn">WFH OT Only</span>
+        </button>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="exportPdfBtn">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+      <span>Download PDF Report</span>
+    </button>
+  </section>
+
+</main>
+
+<!-- ===== DAY ENTRY MODAL ===== -->
+<div class="modal-overlay" id="dayModalOverlay">
+  <div class="modal day-modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <div>
+        <h2 id="dayModalDate">Monday, July 6</h2>
+        <span class="day-type-pill" id="dayTypePill">Weekday</span>
+      </div>
+      <button class="icon-btn" id="dayModalClose" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+
+    <div class="modal-body">
+      <div class="session-block">
+        <div class="session-title">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 9h18" stroke-linecap="round"/></svg>
+          <span data-i18n="officeSession">Office session</span>
+        </div>
+        <div class="time-fields">
+          <div class="time-field-wrap">
+            <label data-i18n="timeIn">Time in</label>
+            <div class="time-input-group" data-target="timeIn1"></div>
+          </div>
+          <div class="time-field-wrap">
+            <label data-i18n="timeOut">Time out</label>
+            <div class="time-input-group" data-target="timeOut1"></div>
+          </div>
+        </div>
+        <div class="session-result" id="session1Result"></div>
+      </div>
+
+      <div class="session-block session-wfh" id="session2Block">
+        <div class="session-title">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 20h8M12 17v3" stroke-linecap="round"/></svg>
+          <span data-i18n="wfhSession">Online / work-from-home session</span>
+        </div>
+        <div id="wfhSessionsList"></div>
+        <button type="button" class="link-btn link-add" id="addWfhSessionBtn" data-i18n="addSession">+ Add session</button>
+      </div>
+
+      <div class="field-row">
+        <label data-i18n="noteLabel">Note (optional)</label>
+        <input type="text" id="dayNote" class="text-input" data-i18n-placeholder="notePlaceholder" placeholder="e.g. Special assignment">
+      </div>
+
+      <div class="day-total-banner" id="dayTotalBanner">
+        <span data-i18n="dayTotalOt">Total OT for this day</span>
+        <strong id="dayTotalValue">0h 00m</strong>
+      </div>
+
+      <div class="daytype-override">
+        <button type="button" class="daytype-override-trigger" id="daytypeOverrideTrigger">
+          <span data-i18n="overrideDayType">Override automatic day type</span>
+          <span class="daytype-current" id="daytypeCurrentLabel" data-i18n="auto">Auto</span>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="segmented daytype-segment" id="dayTypeSegment" hidden>
+          <button type="button" data-val="auto" class="seg-btn active" data-i18n="auto">Auto</button>
+          <button type="button" data-val="weekday" class="seg-btn" data-i18n="weekday">Weekday</button>
+          <button type="button" data-val="weekend" class="seg-btn" data-i18n="weekendHoliday">Weekend/Holiday</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="clearDayBtn" data-i18n="clearDay">Clear day</button>
+      <button class="btn btn-primary" id="saveDayBtn" data-i18n="saveClose">Save &amp; close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SETTINGS MODAL ===== -->
+<div class="modal-overlay" id="settingsOverlay">
+  <div class="modal settings-modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <h2 data-i18n="settingsTitle">OT Rules &amp; Settings</h2>
+      <button class="icon-btn" id="settingsClose" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body settings-body">
+
+      <div class="settings-group">
+        <h3 data-i18n="orgSettings">Institution</h3>
+        <div class="field-row">
+          <label data-i18n="orgName">Institution name</label>
+          <input type="text" id="setOrgName" class="text-input" data-i18n-placeholder="orgNamePlaceholder" placeholder="e.g. National Institute of Labour Studies">
+        </div>
+        <div class="field-row">
+          <label data-i18n="employeeName">Employee name</label>
+          <input type="text" id="setEmpName" class="text-input">
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <h3 data-i18n="weekdayRules">Weekday OT rules</h3>
+        <div class="field-grid">
+          <div class="field-row">
+            <label data-i18n="stdStart">Standard start time</label>
+            <div class="time-input-group" data-target="setStdStart"></div>
+          </div>
+          <div class="field-row">
+            <label data-i18n="stdEnd">Standard end time</label>
+            <div class="time-input-group" data-target="setStdEnd"></div>
+          </div>
+          <div class="field-row">
+            <label data-i18n="graceEnd">Grace arrival up to</label>
+            <div class="time-input-group" data-target="setGraceEnd"></div>
+          </div>
+          <div class="field-row otblock-row">
+            <label data-i18n="otBlock">OT counted in blocks of (minutes)</label>
+            <div class="checkbox-group" id="setOtBlockGroup">
+              <label class="checkbox-pill">
+                <input type="checkbox" name="otBlockChoice" value="15" checked> <span>15</span>
+              </label>
+              <label class="checkbox-pill">
+                <input type="checkbox" name="otBlockChoice" value="30"> <span>30</span>
+              </label>
+              <label class="checkbox-pill">
+                <input type="checkbox" name="otBlockChoice" value="45"> <span>45</span>
+              </label>
+            </div>
+          </div>
+        </div>
+        <p class="hint-text" data-i18n="otBlockHint">Only one block size applies at a time — the government default is 15 minutes. Tick 30 or 45 instead only if this institution uses a larger block.</p>
+        <p class="hint-text" data-i18n="weekdayHint">If someone arrives late (within the grace period), they must cover that time after the standard end time before OT starts counting.</p>
+        <p class="hint-text" data-i18n="minHourHint">The first full hour of overtime must be completed before any OT is granted — after that, time is counted in the block size selected above. This applies to weekdays, weekends and holidays alike.</p>
+      </div>
+
+      <div class="settings-group">
+        <h3 data-i18n="weekendRules">Weekend / holiday rules</h3>
+        <p class="hint-text" data-i18n="weekendHint">On weekends and public holidays, the entire time worked counts as overtime, calculated in the same block size from the actual time in to time out.</p>
+      </div>
+
+      <div class="settings-group">
+        <h3 data-i18n="rateSettings">Payment rates (optional)</h3>
+
+        <div class="salary-calc">
+          <div class="salary-calc-label" data-i18n="salaryCalcTitle">Calculate rate from monthly salary</div>
+          <div class="salary-calc-row">
+            <input type="number" min="0" step="1" id="setMonthlySalary" class="text-input salary-input" data-i18n-placeholder="salaryPlaceholder" placeholder="e.g. 75000">
+            <span class="salary-calc-op">÷ 240 ×</span>
+            <select id="setOtMultiplier" class="text-input salary-multiplier">
+              <option value="1">1×</option>
+              <option value="1.5" selected>1.5×</option>
+              <option value="2">2×</option>
+              <option value="custom" data-i18n="custom">Custom</option>
+            </select>
+            <input type="number" min="0" step="0.01" id="setOtMultiplierCustom" class="text-input salary-multiplier-custom" placeholder="1.25" hidden>
+          </div>
+          <div class="salary-calc-result-row">
+            <span class="salary-calc-result" id="salaryCalcResult">= LKR 0.00 / hr</span>
+            <div class="salary-calc-apply">
+              <button type="button" class="btn btn-ghost btn-tiny" id="applyRateWeekday" data-i18n="applyToWeekday">→ Weekday</button>
+              <button type="button" class="btn btn-ghost btn-tiny" id="applyRateWeekend" data-i18n="applyToWeekend">→ Weekend</button>
+              <button type="button" class="btn btn-ghost btn-tiny" id="applyRateWfh" data-i18n="applyToWfh">→ WFH</button>
+            </div>
+          </div>
+          <p class="hint-text" data-i18n="salaryCalcHint">This is just a helper — it doesn't change anything until you click one of the arrow buttons to copy the result into a rate field below.</p>
+        </div>
+
+        <div class="field-grid">
+          <div class="field-row">
+            <label data-i18n="currency">Currency label</label>
+            <input type="text" id="setCurrency" class="text-input" value="LKR">
+          </div>
+          <div class="field-row">
+            <label data-i18n="weekdayRate">Weekday OT rate / hour</label>
+            <input type="number" min="0" step="0.01" id="setWeekdayRate" class="text-input" value="0">
+          </div>
+          <div class="field-row">
+            <label data-i18n="weekendRate">Weekend/holiday OT rate / hour</label>
+            <input type="number" min="0" step="0.01" id="setWeekendRate" class="text-input" value="0">
+          </div>
+          <div class="field-row">
+            <label data-i18n="wfhRate">Online/WFH OT rate / hour</label>
+            <input type="number" min="0" step="0.01" id="setWfhRate" class="text-input" value="0">
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <h3 data-i18n="otLimitTitle">OT Limit</h3>
+        <div class="field-grid">
+          <div class="field-row">
+            <label data-i18n="otLimitLabel">Monthly OT limit (hours)</label>
+            <input type="number" min="0" step="0.5" id="setOtLimitHours" class="text-input" data-i18n-placeholder="otLimitPlaceholder" placeholder="e.g. 40" value="0">
+          </div>
+          <div class="field-row">
+            <label data-i18n="wfhCapLabel">WFH/Online daily OT cap (hours)</label>
+            <input type="number" min="0" step="0.5" id="setWfhCapHours" class="text-input" data-i18n-placeholder="wfhCapPlaceholder" placeholder="e.g. 4" value="4">
+          </div>
+        </div>
+        <p class="hint-text" data-i18n="otLimitHint">Used by the "OT Limit Split Report" below to separate OT that falls within this ceiling from OT that goes over it. This varies from employee to employee — leave at 0 if there's no ceiling for this employee.</p>
+        <p class="hint-text" data-i18n="wfhCapHint">Maximum credited OT per day across all WFH/online sessions combined for that day (default 4h). This rule is separate from office OT, which has no daily ceiling here. Set to 0 to remove the daily cap.</p>
+      </div>
+
+      <div class="settings-group danger-zone">
+        <h3 data-i18n="dataMgmt">Data</h3>
+        <div class="danger-row">
+          <p data-i18n="resetHint">Erase all saved entries and settings from this browser.</p>
+          <button class="btn btn-danger-outline" id="resetAllBtn" data-i18n="resetAll">Reset everything</button>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-foot">
+      <span class="last-saved-note" id="settingsLastSaved"></span>
+      <button class="btn btn-primary" id="settingsSaveBtn" data-i18n="saveSettings">Save settings</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<footer class="app-footer">
+  <span>Developed with <span class="heart">❤️</span> by <a href="https://lakshan.netlify.app/" target="_blank" rel="noopener">V.P.R. Lakshan Vidanapathirana</a></span>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="i18n.js"></script>
+<script src="script.js"></script>
+<script>
+  if("serviceWorker" in navigator){
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(() => {
+        // Registration can fail silently (e.g. opened straight from a zip/file://
+        // path instead of being served over http/https) — the app still works
+        // normally without install/offline support in that case.
+      });
+    });
+  }
+</script>
+</body>
+</html>
