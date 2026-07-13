@@ -70,6 +70,10 @@
   .duty-empty{ padding:26px; text-align:center; color: var(--ink-faint); font-size:13px; }
   .duty-footer-actions{ display:flex; gap:12px; flex-wrap:wrap; justify-content:flex-end; margin-top:6px; }
 
+  .check-field-row{ display:flex; flex-direction:column; gap:6px; }
+  .toggle-input{ margin-left:24px; width:calc(100% - 24px); opacity:.55; }
+  .toggle-input:not(:disabled){ opacity:1; }
+
   .src-badge{
     display:inline-block; width:9px; height:9px; border-radius:50%; background: var(--primary); margin-top:12px;
   }
@@ -121,41 +125,48 @@
 
   <div class="duty-card">
     <h2>Report format</h2>
-    <p class="card-sub">Pick what appears on the printed report and how the page is laid out. This is saved on this device, so you only need to set it up once.</p>
+    <p class="card-sub">Kept plain by default, like your office's format — Name + table, nothing else. Tick anything extra you actually want. Saved on this device.</p>
     <div class="opt-grid">
       <div class="opt-col">
-        <label class="section-label">Report title &amp; reference</label>
+        <label class="section-label">Report type</label>
         <div class="field-row">
-          <label>Report title</label>
-          <input type="text" id="optTitle" class="text-input" placeholder="e.g. Overtime Duty Report">
+          <select id="optReportType" class="text-input">
+            <option value="wfh">WFH OT Only</option>
+            <option value="office">Office OT Only</option>
+            <option value="split">OT Limit Split Report</option>
+          </select>
         </div>
-        <div class="field-row">
-          <label>Institution / office name (leave blank to use saved settings)</label>
-          <input type="text" id="optOrgName" class="text-input" placeholder="e.g. Divisional Secretariat — Colombo">
-        </div>
-        <div class="field-row" style="margin-bottom:0;">
-          <label>Reference / file no. (optional)</label>
-          <input type="text" id="optRefNo" class="text-input" placeholder="e.g. DS/EST/OT/2026/07">
+        <p class="hint-text" id="reportTypeHint" style="margin-top:-6px;"></p>
+
+        <label class="section-label" style="margin-top:16px;">Page orientation</label>
+        <div class="radio-group" style="margin-bottom:0;">
+          <label class="radio-pill"><input type="radio" name="orientation" value="landscape"> Landscape</label>
+          <label class="radio-pill"><input type="radio" name="orientation" value="portrait"> Portrait</label>
         </div>
       </div>
       <div class="opt-col">
-        <label class="section-label">Page orientation</label>
-        <div class="radio-group">
-          <label class="radio-pill"><input type="radio" name="orientation" value="portrait"> Portrait</label>
-          <label class="radio-pill"><input type="radio" name="orientation" value="landscape"> Landscape</label>
-        </div>
-        <label class="section-label">Include in header / footer</label>
+        <label class="section-label">Optional extras (unticked = not shown)</label>
         <div class="check-list">
-          <label class="check-row"><input type="checkbox" id="optShowOrg"> Institution / office name</label>
-          <label class="check-row"><input type="checkbox" id="optShowEmp"> Employee name</label>
+          <div class="check-field-row">
+            <label class="check-row"><input type="checkbox" id="optShowTitle"> Report title</label>
+            <input type="text" id="optTitle" class="text-input toggle-input" placeholder="e.g. Overtime Duty Report" disabled>
+          </div>
+          <div class="check-field-row">
+            <label class="check-row"><input type="checkbox" id="optShowOrg"> Institution / office name</label>
+            <input type="text" id="optOrgName" class="text-input toggle-input" placeholder="e.g. Divisional Secretariat — Colombo" disabled>
+          </div>
+          <div class="check-field-row">
+            <label class="check-row"><input type="checkbox" id="optShowRef"> Reference / file no.</label>
+            <input type="text" id="optRefNo" class="text-input toggle-input" placeholder="e.g. DS/EST/OT/2026/07" disabled>
+          </div>
           <label class="check-row"><input type="checkbox" id="optShowPeriod"> Period (month &amp; year)</label>
-          <label class="check-row"><input type="checkbox" id="optShowRef"> Reference / file no.</label>
           <label class="check-row"><input type="checkbox" id="optShowGenerated"> Generated on (date &amp; time)</label>
           <label class="check-row"><input type="checkbox" id="optShowSignatures"> Signature section (Prepared / Checked / Approved)</label>
         </div>
       </div>
     </div>
   </div>
+
 
   <div class="duty-card">
     <h2>Duty entries</h2>
@@ -233,16 +244,23 @@
   var DUTY_TYPES = ["Exam","Online Class","Field Visit","Special Duties","Other"];
 
   var DEFAULT_OPTS = {
-    title: "Overtime Duty Report",
+    title: "",
     orgName: "",
     refNo: "",
-    orientation: "portrait",
-    showOrg: true,
-    showEmp: true,
-    showPeriod: true,
+    orientation: "landscape",
+    reportType: "wfh",
+    showTitle: false,
+    showOrg: false,
+    showPeriod: false,
     showRef: false,
-    showGenerated: true,
-    showSignatures: true
+    showGenerated: false,
+    showSignatures: false
+  };
+
+  var REPORT_TYPE_HINTS = {
+    wfh: "Shows WFH / online-session duty entries, plus any manually added rows (Exam, Field Visit, etc. aren't tagged Office/WFH, so they're always included).",
+    office: "Shows office-session duty entries only, plus any manually added rows.",
+    split: "Shows every entry, grouped into separate Office / WFH / Other sections on the same report."
   };
 
   var importedOrgName = "";
@@ -278,12 +296,13 @@
   }
   function readOptsFromForm(){
     return {
-      title: optTitle.value.trim() || DEFAULT_OPTS.title,
+      title: optTitle.value.trim(),
       orgName: optOrgName.value.trim(),
       refNo: optRefNo.value.trim(),
-      orientation: (document.querySelector('input[name="orientation"]:checked') || {}).value || "portrait",
+      orientation: (document.querySelector('input[name="orientation"]:checked') || {}).value || "landscape",
+      reportType: optReportType.value || "wfh",
+      showTitle: optShowTitle.checked,
       showOrg: optShowOrg.checked,
-      showEmp: optShowEmp.checked,
       showPeriod: optShowPeriod.checked,
       showRef: optShowRef.checked,
       showGenerated: optShowGenerated.checked,
@@ -292,6 +311,7 @@
   }
   function saveOpts(){
     try { localStorage.setItem(LS_REPORT_OPTS, JSON.stringify(readOptsFromForm())); } catch(e){ /* ignore */ }
+    syncToggleStates();
   }
   function applyOptsToForm(opts){
     optTitle.value = opts.title;
@@ -299,13 +319,22 @@
     optRefNo.value = opts.refNo;
     var radio = document.querySelector('input[name="orientation"][value="' + opts.orientation + '"]');
     if(radio) radio.checked = true;
+    optReportType.value = opts.reportType || "wfh";
+    optShowTitle.checked = !!opts.showTitle;
     optShowOrg.checked = !!opts.showOrg;
-    optShowEmp.checked = !!opts.showEmp;
     optShowPeriod.checked = !!opts.showPeriod;
     optShowRef.checked = !!opts.showRef;
     optShowGenerated.checked = !!opts.showGenerated;
     optShowSignatures.checked = !!opts.showSignatures;
+    syncToggleStates();
   }
+  function syncToggleStates(){
+    optTitle.disabled = !optShowTitle.checked;
+    optOrgName.disabled = !optShowOrg.checked;
+    optRefNo.disabled = !optShowRef.checked;
+    reportTypeHint.textContent = REPORT_TYPE_HINTS[optReportType.value] || "";
+  }
+
 
   var LS_ENTRIES = "otr_entries_v1"; // main index.html calendar entries — dateStr -> {dayType,timeIn1,timeOut1,wfhSessions,note}
 
@@ -328,8 +357,10 @@
   var optTitle = document.getElementById("optTitle");
   var optOrgName = document.getElementById("optOrgName");
   var optRefNo = document.getElementById("optRefNo");
+  var optReportType = document.getElementById("optReportType");
+  var reportTypeHint = document.getElementById("reportTypeHint");
+  var optShowTitle = document.getElementById("optShowTitle");
   var optShowOrg = document.getElementById("optShowOrg");
-  var optShowEmp = document.getElementById("optShowEmp");
   var optShowPeriod = document.getElementById("optShowPeriod");
   var optShowRef = document.getElementById("optShowRef");
   var optShowGenerated = document.getElementById("optShowGenerated");
@@ -594,9 +625,10 @@
   periodYearInput.addEventListener("input", saveHeader);
 
   [optTitle, optOrgName, optRefNo].forEach(function(el){ el.addEventListener("input", saveOpts); });
-  [optShowOrg, optShowEmp, optShowPeriod, optShowRef, optShowGenerated, optShowSignatures].forEach(function(el){
+  [optShowTitle, optShowOrg, optShowPeriod, optShowRef, optShowGenerated, optShowSignatures].forEach(function(el){
     el.addEventListener("change", saveOpts);
   });
+  optReportType.addEventListener("change", saveOpts);
   document.querySelectorAll('input[name="orientation"]').forEach(function(el){
     el.addEventListener("change", saveOpts);
   });
@@ -648,6 +680,20 @@
   }
 
   // ---------- Custom PDF report ----------
+  var PURPLE = [75, 58, 135]; // header bar colour, matched to the office's sample format
+
+  function classifyRow(r){
+    if(r.source && r.source.indexOf("off:") === 0) return "office";
+    if(r.source && r.source.indexOf("wfh:") === 0) return "wfh";
+    return "other"; // manually added rows (Exam / Field Visit / etc.) — not tagged Office or WFH
+  }
+
+  function rowsForType(list, type){
+    if(type === "office") return list.filter(function(r){ return classifyRow(r) !== "wfh"; });
+    if(type === "wfh") return list.filter(function(r){ return classifyRow(r) !== "office"; });
+    return list;
+  }
+
   document.getElementById("downloadDutyPdfBtn").addEventListener("click", function(){
     if(rows.length === 0){
       showToast("Add at least one duty entry first");
@@ -662,55 +708,59 @@
     var orgName = opts.orgName || importedOrgName || "";
 
     var jsPDFCtor = window.jspdf.jsPDF;
-    var doc = new jsPDFCtor({ unit: "pt", format: "a4", orientation: opts.orientation === "landscape" ? "landscape" : "portrait" });
+    var doc = new jsPDFCtor({ unit: "pt", format: "a4", orientation: opts.orientation === "portrait" ? "portrait" : "landscape" });
     var pageW = doc.internal.pageSize.getWidth();
     var pageH = doc.internal.pageSize.getHeight();
     var marginX = 40;
+    var tableW = pageW - marginX * 2;
 
-    // --- Letterhead ---
-    var y = 46;
+    var y = 40;
+
+    // --- Optional letterhead bits (all off by default) ---
     if(opts.showOrg && orgName){
-      doc.setFont("helvetica", "bold"); doc.setFontSize(15);
-      doc.setTextColor(10, 66, 62);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(14);
+      doc.setTextColor(30, 30, 30);
       doc.text(orgName, pageW / 2, y, { align: "center" });
-      y += 20;
+      y += 18;
     }
-    doc.setFont("helvetica", "bold"); doc.setFontSize(13.5);
-    doc.setTextColor(15, 92, 86);
-    doc.text(opts.title, pageW / 2, y, { align: "center" });
-    y += 10;
-    doc.setDrawColor(15, 92, 86);
-    doc.setLineWidth(1.1);
-    doc.line(marginX, y, pageW - marginX, y);
-    y += 20;
+    if(opts.showTitle && opts.title){
+      doc.setFont("helvetica", "bold"); doc.setFontSize(13);
+      doc.setTextColor(PURPLE[0], PURPLE[1], PURPLE[2]);
+      doc.text(opts.title, pageW / 2, y, { align: "center" });
+      y += 18;
+    }
+    if(opts.showRef && opts.refNo){
+      doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+      doc.setTextColor(90, 90, 90);
+      doc.text("Reference No.: " + opts.refNo, pageW - marginX, y, { align: "right" });
+      y += 14;
+    }
+    if(opts.showPeriod && period.trim()){
+      doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+      doc.setTextColor(90, 90, 90);
+      doc.text("Period: " + period.trim(), pageW - marginX, y, { align: "right" });
+      y += 14;
+    }
+    if(opts.showGenerated){
+      doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+      doc.setTextColor(90, 90, 90);
+      doc.text("Generated on: " + new Date().toLocaleString(), pageW - marginX, y, { align: "right" });
+      y += 14;
+    }
 
-    // --- Info block (two columns) ---
+    // --- Name box (always shown, matches the office sample format) ---
+    var boxH = 22;
+    doc.setDrawColor(210, 210, 210);
+    doc.setLineWidth(0.7);
+    doc.rect(marginX, y, tableW, boxH);
     doc.setFont("helvetica", "normal"); doc.setFontSize(10);
-    doc.setTextColor(60, 60, 60);
-    var leftX = marginX, rightX = pageW / 2 + 10;
-    var leftY = y, rightY = y;
-    var lineH = 15;
+    doc.setTextColor(20, 20, 20);
+    doc.text("Name: " + (empName || "-"), marginX + 8, y + 14.5);
+    y += boxH;
 
-    function infoLine(label, value, x, curY){
-      doc.setFont("helvetica", "bold");
-      doc.text(label + ":", x, curY);
-      doc.setFont("helvetica", "normal");
-      doc.text(String(value), x + doc.getTextWidth(label + ":  ") + 4, curY);
-      return curY + lineH;
-    }
-
-    if(opts.showEmp && empName){ leftY = infoLine("Employee", empName, leftX, leftY); }
-    if(opts.showPeriod && period.trim()){ leftY = infoLine("Period", period.trim(), leftX, leftY); }
-    if(opts.showRef && opts.refNo){ rightY = infoLine("Reference No.", opts.refNo, rightX, rightY); }
-    if(opts.showGenerated){ rightY = infoLine("Generated on", new Date().toLocaleString(), rightX, rightY); }
-
-    y = Math.max(leftY, rightY, y) + 6;
-
-    // --- Table ---
-    var head = [["#","Programme Name","Month","Date","Time In","Time Out","Duty Type"]];
-    var body = rows.map(function(r, i){
+    var head = [["Programme Name", "Month", "Start Date of Overtime", "Start Time", "End Time", "Duty Type"]];
+    function rowToBody(r){
       return [
-        String(i + 1),
         r.programme || "-",
         r.month || "-",
         formatDateDisplay(r.date),
@@ -718,36 +768,60 @@
         formatTimeDisplay(r.timeOut),
         dutyTypeLabel(r)
       ];
-    });
-
-    doc.autoTable({
-      head: head, body: body, startY: y,
+    }
+    var tableStyle = {
       margin: { left: marginX, right: marginX },
-      styles: { fontSize: 8.5, cellPadding: 5, lineColor: [222, 231, 227], lineWidth: 0.5 },
-      headStyles: { fillColor: [15, 92, 86], textColor: 255, fontStyle: "bold" },
-      alternateRowStyles: { fillColor: [245, 248, 247] },
-      columnStyles: {
-        0: { cellWidth: 22, halign: "center" },
-        1: { cellWidth: opts.orientation === "landscape" ? 300 : 150 }
+      styles: { fontSize: 9, cellPadding: 6, lineColor: [225, 225, 225], lineWidth: 0.5 },
+      headStyles: { fillColor: PURPLE, textColor: 255, fontStyle: "bold", halign: "center" },
+      columnStyles: { 0: { cellWidth: opts.orientation === "landscape" ? 260 : 150 } }
+    };
+
+    function ensureSpace(neededY){
+      if(neededY > pageH - 60){ doc.addPage(); return 40; }
+      return null;
+    }
+
+    function drawSection(label, sectionRows, startY){
+      if(sectionRows.length === 0) return startY;
+      var top = ensureSpace(startY + 40);
+      if(top !== null) startY = top;
+      if(label){
+        doc.setFont("helvetica", "bold"); doc.setFontSize(10.5);
+        doc.setTextColor(PURPLE[0], PURPLE[1], PURPLE[2]);
+        doc.text(label, marginX, startY + 12);
+        startY += 18;
       }
-    });
+      doc.autoTable(Object.assign({
+        head: head, body: sectionRows.map(rowToBody), startY: startY
+      }, tableStyle));
+      return doc.lastAutoTable.finalY + 20;
+    }
 
-    var finalY = doc.lastAutoTable.finalY + 18;
+    if(opts.reportType === "split"){
+      var officeRows = rows.filter(function(r){ return classifyRow(r) === "office"; });
+      var wfhRows = rows.filter(function(r){ return classifyRow(r) === "wfh"; });
+      var otherRows = rows.filter(function(r){ return classifyRow(r) === "other"; });
+      y = drawSection(officeRows.length ? "Office OT" : "", officeRows, y);
+      y = drawSection(wfhRows.length ? "WFH OT" : "", wfhRows, y);
+      y = drawSection(otherRows.length ? "Other duties" : "", otherRows, y);
+    } else {
+      var filtered = rowsForType(rows, opts.reportType);
+      if(filtered.length === 0){
+        showToast("No rows match this report type — try \u201cOT Limit Split Report\u201d to see everything");
+        return;
+      }
+      y = drawSection("", filtered, y);
+    }
 
-    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-    doc.setTextColor(90, 90, 90);
-    doc.text("Total duty entries: " + rows.length, marginX, finalY);
-    finalY += 20;
+    var finalY = y;
 
-    // --- Signature section ---
+    // --- Signature section (off by default) ---
     if(opts.showSignatures){
       var sigNeeded = 70;
-      if(finalY + sigNeeded > pageH - 40){
-        doc.addPage();
-        finalY = 50;
-      }
+      var top2 = ensureSpace(finalY + sigNeeded);
+      if(top2 !== null) finalY = top2;
       var cols = ["Prepared by", "Checked by", "Approved by"];
-      var colW = (pageW - marginX * 2) / cols.length;
+      var colW = tableW / cols.length;
       doc.setDrawColor(140, 140, 140);
       doc.setLineWidth(0.7);
       cols.forEach(function(label, i){
@@ -775,7 +849,8 @@
     }
 
     var fileTag = (empName || "Employee").replace(/[^a-z0-9]+/gi, "-");
-    doc.save((opts.title || "Office-Duty-Report").replace(/[^a-z0-9]+/gi, "-") + "-" + fileTag + ".pdf");
+    var nameTag = (opts.showTitle && opts.title) ? opts.title : "Duty-Report";
+    doc.save(nameTag.replace(/[^a-z0-9]+/gi, "-") + "-" + fileTag + ".pdf");
   });
 
   // --- init ---
