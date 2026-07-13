@@ -70,6 +70,10 @@
   .duty-empty{ padding:26px; text-align:center; color: var(--ink-faint); font-size:13px; }
   .duty-footer-actions{ display:flex; gap:12px; flex-wrap:wrap; justify-content:flex-end; margin-top:6px; }
 
+  .src-badge{
+    display:inline-block; width:9px; height:9px; border-radius:50%; background: var(--primary); margin-top:12px;
+  }
+  .src-badge[hidden]{ display:none; }
   .count-chip{
     display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color: var(--ink-soft);
     background: var(--surface-2); border:1px solid var(--border-soft); border-radius:100px; padding:6px 12px; margin-right:auto;
@@ -160,6 +164,7 @@
         <thead>
           <tr>
             <th style="width:26px;"></th>
+            <th style="width:26px;"></th>
             <th class="duty-desc-cell">Programme Name</th>
             <th>Month</th>
             <th>Start Date of Overtime</th>
@@ -170,9 +175,13 @@
         </thead>
         <tbody id="dutyTableBody"></tbody>
       </table>
-      <div class="duty-empty" id="dutyEmptyState" style="display:none;">No duty entries yet — click "Add row" to start.</div>
+      <div class="duty-empty" id="dutyEmptyState" style="display:none;">No duty entries yet — click "Add row", or "Import from calendar" below.</div>
     </div>
     <div class="duty-table-actions">
+      <button class="btn btn-primary" id="importCalendarBtn" type="button">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16"/></svg>
+        <span>Import from calendar (index page)</span>
+      </button>
       <button class="btn btn-outline" id="addRowBtn" type="button">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
         <span>Add row</span>
@@ -181,6 +190,12 @@
         <span>Clear all rows</span>
       </button>
     </div>
+    <p class="import-hint" id="calendarImportHint">
+      Pulls every day with saved office/WFH hours for the <strong>Period — Month/Year</strong> selected above,
+      straight from the main tool's saved calendar (it reads the same <code>localStorage</code> the index page
+      writes to — no copy-pasting). Programme Name and Duty Type aren't tracked on the calendar, so those stay
+      editable per row after import. Importing again only adds days that aren't already in the table.
+    </p>
   </div>
 
   <div class="duty-footer-actions">
@@ -292,8 +307,10 @@
     optShowSignatures.checked = !!opts.showSignatures;
   }
 
+  var LS_ENTRIES = "otr_entries_v1"; // main index.html calendar entries — dateStr -> {dayType,timeIn1,timeOut1,wfhSessions,note}
+
   function uid(){ return "r" + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
-  function blankRow(){ return { id: uid(), programme:"", month:"", date:"", timeIn:"", timeOut:"", dutyType:"", dutyOther:"" }; }
+  function blankRow(){ return { id: uid(), source: null, programme:"", month:"", date:"", timeIn:"", timeOut:"", dutyType:"", dutyOther:"" }; }
 
   var rows = loadRows();
 
@@ -338,6 +355,107 @@
     return MONTHS[d.getMonth()];
   }
 
+  function pad2(n){ return n < 10 ? "0" + n : "" + n; }
+  function dateStrOf(y, m, d){ return y + "-" + pad2(m + 1) + "-" + pad2(d); }
+  function daysInMonth(y, m){ return new Date(y, m + 1, 0).getDate(); }
+
+  function loadMainEntries(){
+    var parsed = safeParse(localStorage.getItem(LS_ENTRIES), {});
+    return (parsed && typeof parsed === "object") ? parsed : {};
+  }
+
+  // Mirrors migrateEntry() in script.js: older saves used timeIn2/timeOut2
+  // for a single WFH session instead of the wfhSessions array.
+  function normalizedWfhSessions(entry){
+    if(Array.isArray(entry.wfhSessions)) return entry.wfhSessions;
+    if(entry.timeIn2 || entry.timeOut2) return [{ timeIn: entry.timeIn2 || null, timeOut: entry.timeOut2 || null }];
+    return [];
+  }
+
+  function importFromCalendar(){
+    var monthName = periodMonthSelect.value;
+    var year = parseInt(periodYearInput.value, 10);
+    var monthIdx = MONTHS.indexOf(monthName);
+    if(monthIdx === -1 || !year){
+      showToast("Pick a Period — Month and Year first");
+      return;
+    }
+
+    var mainEntries = loadMainEntries();
+    if(!mainEntries || Object.keys(mainEntries).length === 0){
+      showToast("No saved calendar data found — enter OT dates on the main index page first (same site/folder).");
+      return;
+    }
+
+    var existingKeys = {};
+    rows.forEach(function(r){ if(r.source) existingKeys[r.source] = true; });
+
+    var added = 0, skipped = 0;
+    var total = daysInMonth(year, monthIdx);
+
+    for(var d = 1; d <= total; d++){
+      var dateStr = dateStrOf(year, monthIdx, d);
+      var entry = mainEntries[dateStr];
+      if(!entry) continue;
+
+      // Office / weekday-weekend session
+      if(entry.timeIn1 && entry.timeOut1){
+        var offKey = "off:" + dateStr;
+        if(existingKeys[offKey]){
+          skipped++;
+        } else {
+          rows.push({
+            id: uid(), source: offKey,
+            programme: entry.note || "",
+            month: monthName,
+            date: dateStr,
+            timeIn: entry.timeIn1,
+            timeOut: entry.timeOut1,
+            dutyType: "", dutyOther: ""
+          });
+          existingKeys[offKey] = true;
+          added++;
+        }
+      }
+
+      // WFH / online sessions — one row per session
+      var wfh = normalizedWfhSessions(entry);
+      wfh.forEach(function(session, idx){
+        if(!session.timeIn || !session.timeOut) return;
+        var wfhKey = "wfh:" + dateStr + ":" + idx;
+        if(existingKeys[wfhKey]){
+          skipped++;
+          return;
+        }
+        rows.push({
+          id: uid(), source: wfhKey,
+          programme: entry.note || "",
+          month: monthName,
+          date: dateStr,
+          timeIn: session.timeIn,
+          timeOut: session.timeOut,
+          dutyType: "", dutyOther: ""
+        });
+        existingKeys[wfhKey] = true;
+        added++;
+      });
+    }
+
+    if(added === 0 && skipped === 0){
+      showToast("No OT entries found on the calendar for " + monthName + " " + year);
+      return;
+    }
+
+    // Drop the single starter blank row if it's still empty, once we have real data.
+    rows = rows.filter(function(r){
+      return r.source || r.programme || r.month || r.date || r.timeIn || r.timeOut || r.dutyType;
+    });
+
+    saveRows(rows);
+    renderRows();
+    showToast(added + " entr" + (added === 1 ? "y" : "ies") + " imported" + (skipped ? ", " + skipped + " already here" : ""));
+  }
+
   function renderRows(){
     tbody.innerHTML = "";
     emptyState.style.display = rows.length ? "none" : "block";
@@ -359,6 +477,14 @@
       });
       tdRemove.appendChild(removeBtn);
       tr.appendChild(tdRemove);
+
+      var tdBadge = document.createElement("td");
+      var badge = document.createElement("span");
+      badge.className = "src-badge";
+      badge.title = "Imported from the main calendar";
+      if(!row.source) badge.hidden = true;
+      tdBadge.appendChild(badge);
+      tr.appendChild(tdBadge);
 
       var tdProg = document.createElement("td");
       tdProg.className = "duty-desc-cell";
@@ -446,6 +572,8 @@
       tbody.appendChild(tr);
     });
   }
+
+  document.getElementById("importCalendarBtn").addEventListener("click", importFromCalendar);
 
   document.getElementById("addRowBtn").addEventListener("click", function(){
     rows.push(blankRow());
@@ -676,7 +804,10 @@
     applyOptsToForm(loadOpts());
     if(!optOrgName.value && importedOrgName){ /* keep field blank, PDF still falls back to importedOrgName */ }
 
-    if(rows.length === 0) rows.push(blankRow());
+    if(rows.length === 0){
+      importFromCalendar();
+      if(rows.length === 0) rows.push(blankRow());
+    }
     renderRows();
   })();
 })();
