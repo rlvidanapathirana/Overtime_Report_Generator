@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Special Duty / OT Report — Overtime Report Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Sinhala:wght@400;500;600;700&family=Noto+Sans+Tamil:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="stylesheet" href="style.css">
+<style>
+  .duty-wrap{ max-width: 1180px; margin: 0 auto; padding: 24px 20px 60px; }
+  .duty-topbar{ margin-bottom:22px; }
+  .duty-topbar .brand{ font-size:19px; font-weight:800; color:var(--primary-strong); }
+  .duty-topbar .sub{ font-size:12.5px; color:var(--ink-soft); margin-top:2px; max-width:680px; }
+
+  .duty-card{ background: var(--surface); border:1px solid var(--border-soft); border-radius: var(--radius-lg); padding:22px; box-shadow: var(--shadow-sm); margin-bottom:22px; }
+  .duty-card h2{ font-size:15px; font-weight:800; color:var(--primary-strong); margin:0 0 16px; }
+
+  .duty-header-grid{ display:grid; grid-template-columns: 1.4fr 1fr .8fr; gap:16px; }
+  @media (max-width:720px){ .duty-header-grid{ grid-template-columns: 1fr; } }
+
+  .import-row{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .import-hint{ font-size:12px; color:var(--ink-faint); line-height:1.6; margin-top:10px; }
+  .autofill-note{ font-size:12px; color:var(--primary-strong); margin-top:10px; display:none; }
+
+  .duty-table-scroll{ overflow-x:auto; border:1px solid var(--border-soft); border-radius: var(--radius-md); }
+  table.duty-table{ width:100%; border-collapse:collapse; min-width: 980px; font-size:13px; }
+  table.duty-table th{ background: var(--primary-tint); color: var(--primary-strong); font-size:11.5px; font-weight:800; text-align:left; padding:10px 8px; white-space:nowrap; border-bottom:1px solid var(--border-soft); }
+  table.duty-table td{ padding:8px; border-bottom:1px solid var(--border-soft); vertical-align:top; }
+  table.duty-table tr:last-child td{ border-bottom:none; }
+  table.duty-table input, table.duty-table select{
+    width:100%; min-width:110px; padding:7px 8px; border-radius:8px; border:1px solid var(--border);
+    background: var(--surface-2); color: var(--ink); font-family: var(--font-ui); font-size:12.5px;
+  }
+  table.duty-table input:focus, table.duty-table select:focus{ border-color: var(--primary); outline:none; }
+  .duty-desc-cell{ min-width: 220px; }
+  .duty-desc-cell input{ min-width:200px; }
+  .duty-other-input{ margin-top:6px; }
+  .row-remove-btn{
+    border:none; background: var(--rose-tint); color: var(--rose); width:30px; height:30px; border-radius:8px;
+    font-weight:800; cursor:pointer; font-size:15px; line-height:1;
+  }
+  .row-remove-btn:hover{ filter:brightness(1.08); }
+  .duty-table-actions{ display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; }
+  .duty-empty{ padding:26px; text-align:center; color: var(--ink-faint); font-size:13px; }
+  .duty-footer-actions{ display:flex; gap:12px; flex-wrap:wrap; justify-content:flex-end; margin-top:6px; }
+</style>
+</head>
+<body>
+
+<div class="duty-wrap">
+  <div class="duty-topbar">
+    <div class="brand">Special Duty / OT Report</div>
+    <div class="sub">For exams, online classes, field visits, special duties and other one-off assignments — separate from the daily office/WFH ledger. This page lives in the same site as the main tool, so it reads the Employee Name already saved there.</div>
+  </div>
+
+  <div class="duty-card" id="importCard">
+    <h2>Employee details</h2>
+    <div class="duty-header-grid">
+      <div class="field-row">
+        <label>Employee name</label>
+        <input type="text" id="dutyEmpName" class="text-input" placeholder="Employee name">
+      </div>
+      <div class="field-row">
+        <label>Period — Month</label>
+        <select id="dutyPeriodMonth" class="text-input"></select>
+      </div>
+      <div class="field-row">
+        <label>Period — Year</label>
+        <input type="number" id="dutyPeriodYear" class="text-input" min="2000" max="2100" step="1">
+      </div>
+    </div>
+    <p class="autofill-note" id="autofillNote"></p>
+
+    <div class="import-row" id="importRow" style="display:none; margin-top:6px;">
+      <button class="btn btn-outline" id="importBtn" type="button">Import backup (.json)</button>
+      <input type="file" id="importInput" accept="application/json" hidden>
+    </div>
+    <p class="import-hint" id="importHint" style="display:none;">
+      Couldn't find any saved details on this page. If you're opening this file from a different
+      address than the main tool, export a backup from the main app ("Export JSON") and import it
+      here to bring over the Employee Name.
+    </p>
+  </div>
+
+  <div class="duty-card">
+    <h2>Duty entries</h2>
+    <div class="duty-table-scroll">
+      <table class="duty-table" id="dutyTable">
+        <thead>
+          <tr>
+            <th style="width:26px;"></th>
+            <th class="duty-desc-cell">Programme Name</th>
+            <th>Month</th>
+            <th>Start Date of Overtime</th>
+            <th>Start Time (Time In)</th>
+            <th>End Time (Time Out)</th>
+            <th style="min-width:170px;">Duty Type</th>
+          </tr>
+        </thead>
+        <tbody id="dutyTableBody"></tbody>
+      </table>
+      <div class="duty-empty" id="dutyEmptyState" style="display:none;">No duty entries yet — click "Add row" to start.</div>
+    </div>
+    <div class="duty-table-actions">
+      <button class="btn btn-outline" id="addRowBtn" type="button">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        <span>Add row</span>
+      </button>
+      <button class="btn btn-outline" id="clearAllBtn" type="button">
+        <span>Clear all rows</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="duty-footer-actions">
+    <button class="btn btn-primary" id="downloadDutyPdfBtn" type="button">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+      <span>Download PDF Report</span>
+    </button>
+  </div>
+
+  <div class="toast" id="dutyToast"></div>
+
+  <footer class="app-footer">
+    <span>Developed with <span class="heart">❤️</span> by <a href="https://lakshan.netlify.app/" target="_blank" rel="noopener">V.P.R. Lakshan Vidanapathirana</a></span>
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  // Same localStorage key the main tool (script.js) writes to. Reading it
+  // here only works when this page is served from the exact same origin as
+  // index.html (same domain — e.g. both on the same GitHub Pages site).
+  var LS_SETTINGS = "otr_settings_v1";
+  var LS_DUTY_ROWS = "otr_duty_rows_v1";
+  var LS_DUTY_HEADER = "otr_duty_header_v1";
+
+  var MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  var DUTY_TYPES = ["Exam","Online Class","Field Visit","Special Duties","Other"];
+
+  var importedOrgName = "";
+
+  function safeParse(raw, fallback){
+    try { return raw ? JSON.parse(raw) : fallback; } catch(e){ return fallback; }
+  }
+
+  function loadSettings(){ return safeParse(localStorage.getItem(LS_SETTINGS), null); }
+
+  function loadRows(){
+    var parsed = safeParse(localStorage.getItem(LS_DUTY_ROWS), []);
+    return Array.isArray(parsed) ? parsed : [];
+  }
+  function saveRows(rows){
+    try { localStorage.setItem(LS_DUTY_ROWS, JSON.stringify(rows)); } catch(e){ /* ignore */ }
+  }
+  function saveHeader(){
+    try {
+      localStorage.setItem(LS_DUTY_HEADER, JSON.stringify({
+        empName: empNameInput.value,
+        periodMonth: periodMonthSelect.value,
+        periodYear: periodYearInput.value
+      }));
+    } catch(e){ /* ignore */ }
+  }
+
+  function uid(){ return "r" + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+  function blankRow(){ return { id: uid(), programme:"", month:"", date:"", timeIn:"", timeOut:"", dutyType:"", dutyOther:"" }; }
+
+  var rows = loadRows();
+
+  var tbody = document.getElementById("dutyTableBody");
+  var emptyState = document.getElementById("dutyEmptyState");
+  var empNameInput = document.getElementById("dutyEmpName");
+  var periodMonthSelect = document.getElementById("dutyPeriodMonth");
+  var periodYearInput = document.getElementById("dutyPeriodYear");
+  var toastEl = document.getElementById("dutyToast");
+  var autofillNote = document.getElementById("autofillNote");
+  var importRow = document.getElementById("importRow");
+  var importHint = document.getElementById("importHint");
+
+  function showToast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(function(){ toastEl.classList.remove("show"); }, 2200);
+  }
+
+  MONTHS.forEach(function(m){
+    var opt = document.createElement("option");
+    opt.value = m; opt.textContent = m;
+    periodMonthSelect.appendChild(opt);
+  });
+
+  function monthFromDate(dateStr){
+    if(!dateStr) return "";
+    var d = new Date(dateStr + "T00:00:00");
+    if(isNaN(d.getTime())) return "";
+    return MONTHS[d.getMonth()];
+  }
+
+  function renderRows(){
+    tbody.innerHTML = "";
+    emptyState.style.display = rows.length ? "none" : "block";
+
+    rows.forEach(function(row){
+      var tr = document.createElement("tr");
+
+      var tdRemove = document.createElement("td");
+      var removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "row-remove-btn";
+      removeBtn.title = "Remove row";
+      removeBtn.textContent = "\u00D7";
+      removeBtn.addEventListener("click", function(){
+        rows = rows.filter(function(r){ return r.id !== row.id; });
+        saveRows(rows);
+        renderRows();
+      });
+      tdRemove.appendChild(removeBtn);
+      tr.appendChild(tdRemove);
+
+      var tdProg = document.createElement("td");
+      tdProg.className = "duty-desc-cell";
+      var progInput = document.createElement("input");
+      progInput.type = "text";
+      progInput.placeholder = "e.g. Diploma in Business Management online course";
+      progInput.value = row.programme;
+      progInput.addEventListener("input", function(){ row.programme = progInput.value; saveRows(rows); });
+      tdProg.appendChild(progInput);
+      tr.appendChild(tdProg);
+
+      var tdMonth = document.createElement("td");
+      var monthSelect = document.createElement("select");
+      var blankOpt = document.createElement("option");
+      blankOpt.value = ""; blankOpt.textContent = "\u2014";
+      monthSelect.appendChild(blankOpt);
+      MONTHS.forEach(function(m){
+        var opt = document.createElement("option");
+        opt.value = m; opt.textContent = m;
+        if(row.month === m) opt.selected = true;
+        monthSelect.appendChild(opt);
+      });
+      monthSelect.addEventListener("change", function(){ row.month = monthSelect.value; saveRows(rows); });
+      tdMonth.appendChild(monthSelect);
+      tr.appendChild(tdMonth);
+
+      var tdDate = document.createElement("td");
+      var dateInput = document.createElement("input");
+      dateInput.type = "date";
+      dateInput.value = row.date;
+      dateInput.addEventListener("change", function(){
+        row.date = dateInput.value;
+        if(!row.month && row.date){
+          row.month = monthFromDate(row.date);
+          monthSelect.value = row.month;
+        }
+        saveRows(rows);
+      });
+      tdDate.appendChild(dateInput);
+      tr.appendChild(tdDate);
+
+      var tdIn = document.createElement("td");
+      var inInput = document.createElement("input");
+      inInput.type = "time";
+      inInput.value = row.timeIn;
+      inInput.addEventListener("change", function(){ row.timeIn = inInput.value; saveRows(rows); });
+      tdIn.appendChild(inInput);
+      tr.appendChild(tdIn);
+
+      var tdOut = document.createElement("td");
+      var outInput = document.createElement("input");
+      outInput.type = "time";
+      outInput.value = row.timeOut;
+      outInput.addEventListener("change", function(){ row.timeOut = outInput.value; saveRows(rows); });
+      tdOut.appendChild(outInput);
+      tr.appendChild(tdOut);
+
+      var tdType = document.createElement("td");
+      var typeSelect = document.createElement("select");
+      var blankTypeOpt = document.createElement("option");
+      blankTypeOpt.value = ""; blankTypeOpt.textContent = "Select\u2026";
+      typeSelect.appendChild(blankTypeOpt);
+      DUTY_TYPES.forEach(function(t){
+        var opt = document.createElement("option");
+        opt.value = t; opt.textContent = t;
+        if(row.dutyType === t) opt.selected = true;
+        typeSelect.appendChild(opt);
+      });
+      var otherInput = document.createElement("input");
+      otherInput.type = "text";
+      otherInput.className = "duty-other-input";
+      otherInput.placeholder = "Specify\u2026";
+      otherInput.value = row.dutyOther;
+      otherInput.style.display = row.dutyType === "Other" ? "block" : "none";
+      typeSelect.addEventListener("change", function(){
+        row.dutyType = typeSelect.value;
+        otherInput.style.display = row.dutyType === "Other" ? "block" : "none";
+        saveRows(rows);
+      });
+      otherInput.addEventListener("input", function(){ row.dutyOther = otherInput.value; saveRows(rows); });
+      tdType.appendChild(typeSelect);
+      tdType.appendChild(otherInput);
+      tr.appendChild(tdType);
+
+      tbody.appendChild(tr);
+    });
+  }
+
+  document.getElementById("addRowBtn").addEventListener("click", function(){
+    rows.push(blankRow());
+    saveRows(rows);
+    renderRows();
+  });
+
+  document.getElementById("clearAllBtn").addEventListener("click", function(){
+    if(rows.length === 0) return;
+    if(!confirm("Remove all duty entries? This cannot be undone.")) return;
+    rows = [];
+    saveRows(rows);
+    renderRows();
+  });
+
+  empNameInput.addEventListener("input", saveHeader);
+  periodMonthSelect.addEventListener("change", saveHeader);
+  periodYearInput.addEventListener("input", saveHeader);
+
+  document.getElementById("importBtn").addEventListener("click", function(){
+    document.getElementById("importInput").click();
+  });
+  document.getElementById("importInput").addEventListener("change", function(e){
+    var file = e.target.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      try{
+        var data = JSON.parse(reader.result);
+        var settings = data.settings || {};
+        if(settings.empName){ empNameInput.value = settings.empName; }
+        importedOrgName = settings.orgName || "";
+        saveHeader();
+        showToast("Imported employee details from backup");
+      }catch(err){
+        showToast("Could not read this backup file");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  });
+
+  function dutyTypeLabel(row){
+    if(row.dutyType === "Other") return row.dutyOther ? ("Other: " + row.dutyOther) : "Other";
+    return row.dutyType || "-";
+  }
+
+  function formatTimeDisplay(t){
+    if(!t) return "-";
+    var parts = t.split(":");
+    var h = parseInt(parts[0],10), m = parts[1];
+    var ampm = h >= 12 ? "PM" : "AM";
+    var h12 = h % 12; if(h12 === 0) h12 = 12;
+    return h12 + ":" + m + " " + ampm;
+  }
+
+  function formatDateDisplay(d){
+    if(!d) return "-";
+    var dt = new Date(d + "T00:00:00");
+    if(isNaN(dt.getTime())) return d;
+    var dd = String(dt.getDate()).padStart(2,"0");
+    var mm = MONTHS[dt.getMonth()].slice(0,3);
+    return dd + " " + mm + " " + dt.getFullYear();
+  }
+
+  document.getElementById("downloadDutyPdfBtn").addEventListener("click", function(){
+    if(rows.length === 0){
+      showToast("Add at least one duty entry first");
+      return;
+    }
+    var empName = empNameInput.value.trim();
+    var period = (periodMonthSelect.value ? (periodMonthSelect.value + " ") : "") + (periodYearInput.value || "");
+
+    var jsPDFCtor = window.jspdf.jsPDF;
+    var doc = new jsPDFCtor({ unit: "pt", format: "a4", orientation: "landscape" });
+
+    doc.setFont("helvetica","bold"); doc.setFontSize(17);
+    doc.setTextColor(15,92,86);
+    doc.text("Special Duty / OT Report", 40, 46);
+
+    doc.setFont("helvetica","normal"); doc.setFontSize(10);
+    doc.setTextColor(70,70,70);
+    var y = 66;
+    if(importedOrgName){ doc.text("Institution: " + importedOrgName, 40, y); y += 15; }
+    if(empName){ doc.text("Employee: " + empName, 40, y); y += 15; }
+    if(period.trim()){ doc.text("Period: " + period.trim(), 40, y); y += 15; }
+    doc.text("Generated on: " + new Date().toLocaleString(), 40, y); y += 16;
+
+    var head = [["Programme Name","Month","Start Date of Overtime","Start Time (Time In)","End Time (Time Out)","Duty Type"]];
+    var body = rows.map(function(r){
+      return [
+        r.programme || "-",
+        r.month || "-",
+        formatDateDisplay(r.date),
+        formatTimeDisplay(r.timeIn),
+        formatTimeDisplay(r.timeOut),
+        dutyTypeLabel(r)
+      ];
+    });
+
+    doc.autoTable({
+      head: head, body: body, startY: y,
+      styles: { fontSize: 8.5, cellPadding: 5 },
+      headStyles: { fillColor: [15,92,86], textColor: 255 },
+      columnStyles: { 0: { cellWidth: 260 } }
+    });
+
+    var finalY = doc.lastAutoTable.finalY + 24;
+    doc.setFont("helvetica","normal"); doc.setFontSize(5);
+    doc.setTextColor(225,228,226);
+    doc.text("A system by V.P.R. Lakshan Vidanapathirana \u2014 lakshan.vercel.app/ot", 40, finalY);
+
+    var fileTag = (empName || "Employee").replace(/[^a-z0-9]+/gi,"-");
+    doc.save("Special-Duty-OT-Report-" + fileTag + ".pdf");
+  });
+
+  // --- init ---
+  (function init(){
+    var now = new Date();
+    var savedHeader = safeParse(localStorage.getItem(LS_DUTY_HEADER), null);
+    var settings = loadSettings();
+
+    periodMonthSelect.value = (savedHeader && savedHeader.periodMonth) || MONTHS[now.getMonth()];
+    periodYearInput.value = (savedHeader && savedHeader.periodYear) || now.getFullYear();
+
+    if(savedHeader && savedHeader.empName){
+      empNameInput.value = savedHeader.empName;
+    } else if(settings && settings.empName){
+      empNameInput.value = settings.empName;
+      importedOrgName = settings.orgName || "";
+      autofillNote.textContent = "Employee name was auto-filled from the main OT Report Generator's saved settings.";
+      autofillNote.style.display = "block";
+    } else {
+      // No same-origin data found — likely opened from a different address
+      // than the main tool. Offer the manual backup-import fallback.
+      importRow.style.display = "flex";
+      importHint.style.display = "block";
+    }
+
+    if(rows.length === 0) rows.push(blankRow());
+    renderRows();
+  })();
+})();
+</script>
+</body>
+</html>
