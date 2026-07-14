@@ -70,6 +70,10 @@
   .duty-empty{ padding:26px; text-align:center; color: var(--ink-faint); font-size:13px; }
   .duty-footer-actions{ display:flex; gap:12px; flex-wrap:wrap; justify-content:flex-end; margin-top:6px; }
 
+  .bulk-duty-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:14px; padding-top:14px; border-top:1px dashed var(--border-soft); }
+  .bulk-duty-row .text-input{ width:auto; min-width:150px; }
+  .bulk-duty-label{ font-size:12.5px; font-weight:700; color:var(--ink-soft); }
+
   .check-field-row{ display:flex; flex-direction:column; gap:6px; }
   .toggle-input{ margin-left:24px; width:calc(100% - 24px); opacity:.55; }
   .toggle-input:not(:disabled){ opacity:1; }
@@ -169,11 +173,39 @@
 
 
   <div class="duty-card">
+    <h2>Table columns</h2>
+    <p class="card-sub">Untick anything you don't want in the printed report. The entry table below always keeps the core fields so you don't lose data while editing.</p>
+    <div class="opt-grid">
+      <div class="opt-col">
+        <label class="section-label">Columns in the report</label>
+        <div class="check-list">
+          <label class="check-row"><input type="checkbox" id="colProgramme" checked> Programme Name</label>
+          <label class="check-row"><input type="checkbox" id="colMonth" checked> Month</label>
+          <label class="check-row"><input type="checkbox" id="colDate" checked> Start Date of Overtime</label>
+          <label class="check-row"><input type="checkbox" id="colTimeIn" checked> Start Time</label>
+          <label class="check-row"><input type="checkbox" id="colTimeOut" checked> End Time</label>
+          <label class="check-row"><input type="checkbox" id="colDutyType" checked> Duty Type</label>
+        </div>
+      </div>
+      <div class="opt-col">
+        <label class="section-label">Extra optional columns</label>
+        <div class="check-list">
+          <label class="check-row"><input type="checkbox" id="colOtWorked"> OT hours worked (auto, from Start/End time)</label>
+          <label class="check-row"><input type="checkbox" id="colOtApproved"> OT hours approved</label>
+          <label class="check-row"><input type="checkbox" id="colAmount"> Amount received</label>
+        </div>
+        <p class="hint-text" style="margin-top:8px;">Ticking these adds editable columns to the entry table below, and includes them in the report.</p>
+      </div>
+    </div>
+  </div>
+
+
+  <div class="duty-card">
     <h2>Duty entries</h2>
     <div class="duty-table-scroll">
       <table class="duty-table" id="dutyTable">
         <thead>
-          <tr>
+          <tr id="dutyTableHeadRow">
             <th style="width:26px;"></th>
             <th style="width:26px;"></th>
             <th class="duty-desc-cell">Programme Name</th>
@@ -201,6 +233,21 @@
         <span>Clear all rows</span>
       </button>
     </div>
+
+    <div class="bulk-duty-row">
+      <span class="bulk-duty-label">Bulk-set Duty Type:</span>
+      <select id="bulkDutyType" class="text-input">
+        <option value="">Select…</option>
+        <option value="Exam">Exam</option>
+        <option value="Online Class">Online Class</option>
+        <option value="Field Visit">Field Visit</option>
+        <option value="Special Duties">Special Duties</option>
+        <option value="Other">Other</option>
+      </select>
+      <input type="text" id="bulkDutyOther" class="text-input" placeholder="Specify…" style="display:none; max-width:200px;">
+      <button class="btn btn-outline" id="bulkApplyBtn" type="button">Apply to all rows</button>
+    </div>
+
     <p class="import-hint" id="calendarImportHint">
       Pulls every day with saved office/WFH hours for the <strong>Period — Month/Year</strong> selected above,
       straight from the main tool's saved calendar (it reads the same <code>localStorage</code> the index page
@@ -254,7 +301,16 @@
     showPeriod: false,
     showRef: false,
     showGenerated: false,
-    showSignatures: false
+    showSignatures: false,
+    colProgramme: true,
+    colMonth: true,
+    colDate: true,
+    colTimeIn: true,
+    colTimeOut: true,
+    colDutyType: true,
+    colOtWorked: false,
+    colOtApproved: false,
+    colAmount: false
   };
 
   var REPORT_TYPE_HINTS = {
@@ -306,7 +362,16 @@
       showPeriod: optShowPeriod.checked,
       showRef: optShowRef.checked,
       showGenerated: optShowGenerated.checked,
-      showSignatures: optShowSignatures.checked
+      showSignatures: optShowSignatures.checked,
+      colProgramme: colProgramme.checked,
+      colMonth: colMonth.checked,
+      colDate: colDate.checked,
+      colTimeIn: colTimeIn.checked,
+      colTimeOut: colTimeOut.checked,
+      colDutyType: colDutyType.checked,
+      colOtWorked: colOtWorked.checked,
+      colOtApproved: colOtApproved.checked,
+      colAmount: colAmount.checked
     };
   }
   function saveOpts(){
@@ -326,6 +391,15 @@
     optShowRef.checked = !!opts.showRef;
     optShowGenerated.checked = !!opts.showGenerated;
     optShowSignatures.checked = !!opts.showSignatures;
+    colProgramme.checked = opts.colProgramme !== false;
+    colMonth.checked = opts.colMonth !== false;
+    colDate.checked = opts.colDate !== false;
+    colTimeIn.checked = opts.colTimeIn !== false;
+    colTimeOut.checked = opts.colTimeOut !== false;
+    colDutyType.checked = opts.colDutyType !== false;
+    colOtWorked.checked = !!opts.colOtWorked;
+    colOtApproved.checked = !!opts.colOtApproved;
+    colAmount.checked = !!opts.colAmount;
     syncToggleStates();
   }
   function syncToggleStates(){
@@ -339,7 +413,7 @@
   var LS_ENTRIES = "otr_entries_v1"; // main index.html calendar entries — dateStr -> {dayType,timeIn1,timeOut1,wfhSessions,note}
 
   function uid(){ return "r" + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
-  function blankRow(){ return { id: uid(), source: null, programme:"", month:"", date:"", timeIn:"", timeOut:"", dutyType:"", dutyOther:"" }; }
+  function blankRow(){ return { id: uid(), source: null, programme:"", month:"", date:"", timeIn:"", timeOut:"", dutyType:"", dutyOther:"", otApproved:"", amount:"" }; }
 
   var rows = loadRows();
 
@@ -365,6 +439,22 @@
   var optShowRef = document.getElementById("optShowRef");
   var optShowGenerated = document.getElementById("optShowGenerated");
   var optShowSignatures = document.getElementById("optShowSignatures");
+
+  var colProgramme = document.getElementById("colProgramme");
+  var colMonth = document.getElementById("colMonth");
+  var colDate = document.getElementById("colDate");
+  var colTimeIn = document.getElementById("colTimeIn");
+  var colTimeOut = document.getElementById("colTimeOut");
+  var colDutyType = document.getElementById("colDutyType");
+  var colOtWorked = document.getElementById("colOtWorked");
+  var colOtApproved = document.getElementById("colOtApproved");
+  var colAmount = document.getElementById("colAmount");
+
+  var dutyTableHeadRow = document.getElementById("dutyTableHeadRow");
+  var bulkDutyType = document.getElementById("bulkDutyType");
+  var bulkDutyOther = document.getElementById("bulkDutyOther");
+  var bulkApplyBtn = document.getElementById("bulkApplyBtn");
+
 
   function showToast(msg){
     toastEl.textContent = msg;
@@ -403,18 +493,41 @@
     return [];
   }
 
+  function refreshEmployeeDetailsFromStorage(){
+    var settings = loadSettings();
+    var changed = false;
+    if(settings && settings.empName && settings.empName !== empNameInput.value){
+      empNameInput.value = settings.empName;
+      changed = true;
+    }
+    if(settings && settings.orgName){ importedOrgName = settings.orgName; }
+    if(changed){
+      saveHeader();
+      autofillNote.textContent = "Employee name refreshed from the main OT Report Generator's saved settings.";
+      autofillNote.style.display = "block";
+    }
+    return changed;
+  }
+
   function importFromCalendar(){
+    // Always start from whatever is actually saved — picks up edits made in
+    // another tab (index.html, duty-report.html, or this page elsewhere).
+    rows = loadRows();
+    var empChanged = refreshEmployeeDetailsFromStorage();
+
     var monthName = periodMonthSelect.value;
     var year = parseInt(periodYearInput.value, 10);
     var monthIdx = MONTHS.indexOf(monthName);
     if(monthIdx === -1 || !year){
       showToast("Pick a Period — Month and Year first");
+      renderRows();
       return;
     }
 
     var mainEntries = loadMainEntries();
     if(!mainEntries || Object.keys(mainEntries).length === 0){
       showToast("No saved calendar data found — enter OT dates on the main index page first (same site/folder).");
+      renderRows();
       return;
     }
 
@@ -442,7 +555,7 @@
             date: dateStr,
             timeIn: entry.timeIn1,
             timeOut: entry.timeOut1,
-            dutyType: "", dutyOther: ""
+            dutyType: "", dutyOther: "", otApproved: "", amount: ""
           });
           existingKeys[offKey] = true;
           added++;
@@ -465,29 +578,51 @@
           date: dateStr,
           timeIn: session.timeIn,
           timeOut: session.timeOut,
-          dutyType: "", dutyOther: ""
+          dutyType: "", dutyOther: "", otApproved: "", amount: ""
         });
         existingKeys[wfhKey] = true;
         added++;
       });
     }
 
-    if(added === 0 && skipped === 0){
-      showToast("No OT entries found on the calendar for " + monthName + " " + year);
-      return;
+    // Drop the single starter blank row if it's still empty, once we have real data.
+    if(added > 0){
+      rows = rows.filter(function(r){
+        return r.source || r.programme || r.month || r.date || r.timeIn || r.timeOut || r.dutyType;
+      });
+      saveRows(rows);
     }
 
-    // Drop the single starter blank row if it's still empty, once we have real data.
-    rows = rows.filter(function(r){
-      return r.source || r.programme || r.month || r.date || r.timeIn || r.timeOut || r.dutyType;
-    });
-
-    saveRows(rows);
     renderRows();
-    showToast(added + " entr" + (added === 1 ? "y" : "ies") + " imported" + (skipped ? ", " + skipped + " already here" : ""));
+
+    if(added === 0 && skipped === 0){
+      showToast(empChanged ? "Employee name synced — no OT entries found for " + monthName + " " + year : "No OT entries found on the calendar for " + monthName + " " + year);
+      return;
+    }
+    showToast(added + " entr" + (added === 1 ? "y" : "ies") + " imported" + (skipped ? ", " + skipped + " already here" : "") + (empChanged ? " — employee name synced" : ""));
+  }
+
+  function syncExtraColumnHeaders(){
+    dutyTableHeadRow.querySelectorAll(".extra-col-th").forEach(function(th){ th.remove(); });
+    if(colOtWorked.checked){
+      var th1 = document.createElement("th");
+      th1.className = "extra-col-th"; th1.textContent = "OT Hours Worked";
+      dutyTableHeadRow.appendChild(th1);
+    }
+    if(colOtApproved.checked){
+      var th2 = document.createElement("th");
+      th2.className = "extra-col-th"; th2.textContent = "OT Hours Approved";
+      dutyTableHeadRow.appendChild(th2);
+    }
+    if(colAmount.checked){
+      var th3 = document.createElement("th");
+      th3.className = "extra-col-th"; th3.textContent = "Amount Received";
+      dutyTableHeadRow.appendChild(th3);
+    }
   }
 
   function renderRows(){
+    syncExtraColumnHeaders();
     tbody.innerHTML = "";
     emptyState.style.display = rows.length ? "none" : "block";
     rowCountChip.textContent = rows.length + (rows.length === 1 ? " entry" : " entries");
@@ -553,6 +688,7 @@
           monthSelect.value = row.month;
         }
         saveRows(rows);
+        refreshOtWorkedCell();
       });
       tdDate.appendChild(dateInput);
       tr.appendChild(tdDate);
@@ -561,7 +697,7 @@
       var inInput = document.createElement("input");
       inInput.type = "time";
       inInput.value = row.timeIn;
-      inInput.addEventListener("change", function(){ row.timeIn = inInput.value; saveRows(rows); });
+      inInput.addEventListener("change", function(){ row.timeIn = inInput.value; saveRows(rows); refreshOtWorkedCell(); });
       tdIn.appendChild(inInput);
       tr.appendChild(tdIn);
 
@@ -569,7 +705,7 @@
       var outInput = document.createElement("input");
       outInput.type = "time";
       outInput.value = row.timeOut;
-      outInput.addEventListener("change", function(){ row.timeOut = outInput.value; saveRows(rows); });
+      outInput.addEventListener("change", function(){ row.timeOut = outInput.value; saveRows(rows); refreshOtWorkedCell(); });
       tdOut.appendChild(outInput);
       tr.appendChild(tdOut);
 
@@ -599,6 +735,39 @@
       tdType.appendChild(typeSelect);
       tdType.appendChild(otherInput);
       tr.appendChild(tdType);
+
+      var otWorkedCell = null;
+      function refreshOtWorkedCell(){
+        if(otWorkedCell) otWorkedCell.textContent = formatHoursMinutes(computeWorkedMinutes(row.timeIn, row.timeOut));
+      }
+      if(colOtWorked.checked){
+        var tdOtWorked = document.createElement("td");
+        tdOtWorked.style.fontSize = "12.5px";
+        tdOtWorked.style.color = "var(--ink-soft)";
+        tdOtWorked.textContent = formatHoursMinutes(computeWorkedMinutes(row.timeIn, row.timeOut));
+        otWorkedCell = tdOtWorked;
+        tr.appendChild(tdOtWorked);
+      }
+      if(colOtApproved.checked){
+        var tdOtApproved = document.createElement("td");
+        var otApprovedInput = document.createElement("input");
+        otApprovedInput.type = "text";
+        otApprovedInput.placeholder = "e.g. 2h 30m";
+        otApprovedInput.value = row.otApproved || "";
+        otApprovedInput.addEventListener("input", function(){ row.otApproved = otApprovedInput.value; saveRows(rows); });
+        tdOtApproved.appendChild(otApprovedInput);
+        tr.appendChild(tdOtApproved);
+      }
+      if(colAmount.checked){
+        var tdAmount = document.createElement("td");
+        var amountInput = document.createElement("input");
+        amountInput.type = "text";
+        amountInput.placeholder = "e.g. Rs. 1,250.00";
+        amountInput.value = row.amount || "";
+        amountInput.addEventListener("input", function(){ row.amount = amountInput.value; saveRows(rows); });
+        tdAmount.appendChild(amountInput);
+        tr.appendChild(tdAmount);
+      }
 
       tbody.appendChild(tr);
     });
@@ -631,6 +800,35 @@
   optReportType.addEventListener("change", saveOpts);
   document.querySelectorAll('input[name="orientation"]').forEach(function(el){
     el.addEventListener("change", saveOpts);
+  });
+
+  [colProgramme, colMonth, colDate, colTimeIn, colTimeOut, colDutyType].forEach(function(el){
+    el.addEventListener("change", saveOpts);
+  });
+  [colOtWorked, colOtApproved, colAmount].forEach(function(el){
+    el.addEventListener("change", function(){ saveOpts(); renderRows(); });
+  });
+
+  bulkDutyType.addEventListener("change", function(){
+    bulkDutyOther.style.display = bulkDutyType.value === "Other" ? "inline-block" : "none";
+  });
+  bulkApplyBtn.addEventListener("click", function(){
+    if(!bulkDutyType.value){
+      showToast("Pick a Duty Type first");
+      return;
+    }
+    if(rows.length === 0){
+      showToast("No rows to apply to yet");
+      return;
+    }
+    if(!confirm("Set Duty Type to \"" + bulkDutyType.value + "\" for all " + rows.length + " row(s)? This overwrites any existing Duty Type.")) return;
+    rows.forEach(function(r){
+      r.dutyType = bulkDutyType.value;
+      r.dutyOther = bulkDutyType.value === "Other" ? bulkDutyOther.value : "";
+    });
+    saveRows(rows);
+    renderRows();
+    showToast("Duty Type applied to " + rows.length + " row(s)");
   });
 
   document.getElementById("importBtn").addEventListener("click", function(){
@@ -670,17 +868,32 @@
     return h12 + ":" + m + " " + ampm;
   }
 
+  var WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+
   function formatDateDisplay(d){
     if(!d) return "-";
     var dt = new Date(d + "T00:00:00");
     if(isNaN(dt.getTime())) return d;
     var dd = String(dt.getDate()).padStart(2,"0");
-    var mm = MONTHS[dt.getMonth()].slice(0,3);
-    return dd + " " + mm + " " + dt.getFullYear();
+    return dd + " " + MONTHS[dt.getMonth()] + " " + dt.getFullYear() + " - " + WEEKDAYS[dt.getDay()];
+  }
+
+  function computeWorkedMinutes(timeIn, timeOut){
+    if(!timeIn || !timeOut) return null;
+    var inP = timeIn.split(":").map(Number), outP = timeOut.split(":").map(Number);
+    var inMin = inP[0] * 60 + inP[1], outMin = outP[0] * 60 + outP[1];
+    var diff = outMin - inMin;
+    if(diff < 0) diff += 24 * 60;
+    return diff;
+  }
+  function formatHoursMinutes(totalMinutes){
+    if(totalMinutes === null || totalMinutes === undefined) return "-";
+    var h = Math.floor(totalMinutes / 60), m = totalMinutes % 60;
+    return h + "h" + (m ? " " + m + "m" : "");
   }
 
   // ---------- Custom PDF report ----------
-  var PURPLE = [75, 58, 135]; // header bar colour, matched to the office's sample format
+  var GREEN = [15, 92, 86]; // header bar colour — site's own teal/green
 
   function classifyRow(r){
     if(r.source && r.source.indexOf("off:") === 0) return "office";
@@ -725,7 +938,7 @@
     }
     if(opts.showTitle && opts.title){
       doc.setFont("helvetica", "bold"); doc.setFontSize(13);
-      doc.setTextColor(PURPLE[0], PURPLE[1], PURPLE[2]);
+      doc.setTextColor(GREEN[0], GREEN[1], GREEN[2]);
       doc.text(opts.title, pageW / 2, y, { align: "center" });
       y += 18;
     }
@@ -758,22 +971,34 @@
     doc.text("Name: " + (empName || "-"), marginX + 8, y + 14.5);
     y += boxH;
 
-    var head = [["Programme Name", "Month", "Start Date of Overtime", "Start Time", "End Time", "Duty Type"]];
-    function rowToBody(r){
-      return [
-        r.programme || "-",
-        r.month || "-",
-        formatDateDisplay(r.date),
-        formatTimeDisplay(r.timeIn),
-        formatTimeDisplay(r.timeOut),
-        dutyTypeLabel(r)
-      ];
+    var columnDefs = [];
+    if(opts.colProgramme) columnDefs.push({ label: "Programme Name", wide: true, get: function(r){ return r.programme || "-"; } });
+    if(opts.colMonth) columnDefs.push({ label: "Month", get: function(r){ return r.month || "-"; } });
+    if(opts.colDate) columnDefs.push({ label: "Start Date of Overtime", get: function(r){ return formatDateDisplay(r.date); } });
+    if(opts.colTimeIn) columnDefs.push({ label: "Start Time", get: function(r){ return formatTimeDisplay(r.timeIn); } });
+    if(opts.colTimeOut) columnDefs.push({ label: "End Time", get: function(r){ return formatTimeDisplay(r.timeOut); } });
+    if(opts.colDutyType) columnDefs.push({ label: "Duty Type", get: function(r){ return dutyTypeLabel(r); } });
+    if(opts.colOtWorked) columnDefs.push({ label: "OT Hours Worked", get: function(r){ return formatHoursMinutes(computeWorkedMinutes(r.timeIn, r.timeOut)); } });
+    if(opts.colOtApproved) columnDefs.push({ label: "OT Hours Approved", get: function(r){ return r.otApproved || "-"; } });
+    if(opts.colAmount) columnDefs.push({ label: "Amount Received", get: function(r){ return r.amount || "-"; } });
+
+    if(columnDefs.length === 0){
+      showToast("Tick at least one column under \u201cTable columns\u201d first");
+      return;
     }
+
+    var head = [columnDefs.map(function(c){ return c.label; })];
+    function rowToBody(r){
+      return columnDefs.map(function(c){ return c.get(r); });
+    }
+    var wideIdx = columnDefs.findIndex(function(c){ return c.wide; });
+    var colStyles = {};
+    if(wideIdx !== -1) colStyles[wideIdx] = { cellWidth: opts.orientation === "landscape" ? 260 : 150 };
     var tableStyle = {
       margin: { left: marginX, right: marginX },
       styles: { fontSize: 9, cellPadding: 6, lineColor: [225, 225, 225], lineWidth: 0.5 },
-      headStyles: { fillColor: PURPLE, textColor: 255, fontStyle: "bold", halign: "center" },
-      columnStyles: { 0: { cellWidth: opts.orientation === "landscape" ? 260 : 150 } }
+      headStyles: { fillColor: GREEN, textColor: 255, fontStyle: "bold", halign: "center" },
+      columnStyles: colStyles
     };
 
     function ensureSpace(neededY){
@@ -787,7 +1012,7 @@
       if(top !== null) startY = top;
       if(label){
         doc.setFont("helvetica", "bold"); doc.setFontSize(10.5);
-        doc.setTextColor(PURPLE[0], PURPLE[1], PURPLE[2]);
+        doc.setTextColor(GREEN[0], GREEN[1], GREEN[2]);
         doc.text(label, marginX, startY + 12);
         startY += 18;
       }
