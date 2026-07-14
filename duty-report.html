@@ -70,6 +70,19 @@
   .duty-empty{ padding:26px; text-align:center; color: var(--ink-faint); font-size:13px; }
   .duty-footer-actions{ display:flex; gap:12px; flex-wrap:wrap; justify-content:flex-end; margin-top:6px; }
 
+  .sync-status{
+    display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700;
+    padding:7px 12px; border-radius:100px; margin-left:auto;
+  }
+  .sync-status:empty{ display:none; }
+  .sync-status.sync-ok{ background: var(--primary-tint); color: var(--primary-strong); border:1px solid var(--primary-tint-2); }
+  .sync-status.sync-warn{ background: var(--amber-tint, #fff3cd); color: var(--amber-strong, #8a6414); border:1px solid var(--border-soft); }
+
+  .group-header-row td{
+    background: var(--surface-2); color: var(--primary-strong); font-weight:800; font-size:12px;
+    padding:8px 10px; border-bottom:1px solid var(--border-soft);
+  }
+
   .bulk-duty-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:14px; padding-top:14px; border-top:1px dashed var(--border-soft); }
   .bulk-duty-row .text-input{ width:auto; min-width:150px; }
   .bulk-duty-label{ font-size:12.5px; font-weight:700; color:var(--ink-soft); }
@@ -202,6 +215,35 @@
 
   <div class="duty-card">
     <h2>Duty entries</h2>
+    <div class="duty-table-actions" style="margin-top:0; margin-bottom:14px;">
+      <button class="btn btn-primary" id="importCalendarBtn" type="button">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16"/></svg>
+        <span>Import from calendar (index page)</span>
+      </button>
+      <button class="btn btn-outline" id="addRowBtn" type="button">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        <span>Add row</span>
+      </button>
+      <button class="btn btn-outline" id="clearAllBtn" type="button">
+        <span>Clear all rows</span>
+      </button>
+      <span class="sync-status" id="syncStatus"></span>
+    </div>
+
+    <div class="bulk-duty-row" style="margin-top:0; padding-top:0; border-top:none; border-bottom:1px dashed var(--border-soft); padding-bottom:14px;">
+      <span class="bulk-duty-label">Bulk-set Duty Type:</span>
+      <select id="bulkDutyType" class="text-input">
+        <option value="">Select…</option>
+        <option value="Exam">Exam</option>
+        <option value="Online Class">Online Class</option>
+        <option value="Field Visit">Field Visit</option>
+        <option value="Special Duties">Special Duties</option>
+        <option value="Other">Other</option>
+      </select>
+      <input type="text" id="bulkDutyOther" class="text-input" placeholder="Specify…" style="display:none; max-width:200px;">
+      <button class="btn btn-outline" id="bulkApplyBtn" type="button">Apply to all rows</button>
+    </div>
+
     <div class="duty-table-scroll">
       <table class="duty-table" id="dutyTable">
         <thead>
@@ -218,41 +260,15 @@
         </thead>
         <tbody id="dutyTableBody"></tbody>
       </table>
-      <div class="duty-empty" id="dutyEmptyState" style="display:none;">No duty entries yet — click "Add row", or "Import from calendar" below.</div>
-    </div>
-    <div class="duty-table-actions">
-      <button class="btn btn-primary" id="importCalendarBtn" type="button">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16"/></svg>
-        <span>Import from calendar (index page)</span>
-      </button>
-      <button class="btn btn-outline" id="addRowBtn" type="button">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-        <span>Add row</span>
-      </button>
-      <button class="btn btn-outline" id="clearAllBtn" type="button">
-        <span>Clear all rows</span>
-      </button>
-    </div>
-
-    <div class="bulk-duty-row">
-      <span class="bulk-duty-label">Bulk-set Duty Type:</span>
-      <select id="bulkDutyType" class="text-input">
-        <option value="">Select…</option>
-        <option value="Exam">Exam</option>
-        <option value="Online Class">Online Class</option>
-        <option value="Field Visit">Field Visit</option>
-        <option value="Special Duties">Special Duties</option>
-        <option value="Other">Other</option>
-      </select>
-      <input type="text" id="bulkDutyOther" class="text-input" placeholder="Specify…" style="display:none; max-width:200px;">
-      <button class="btn btn-outline" id="bulkApplyBtn" type="button">Apply to all rows</button>
+      <div class="duty-empty" id="dutyEmptyState" style="display:none;">No duty entries yet — click "Add row", or "Import from calendar" above.</div>
     </div>
 
     <p class="import-hint" id="calendarImportHint">
       Pulls every day with saved office/WFH hours for the <strong>Period — Month/Year</strong> selected above,
       straight from the main tool's saved calendar (it reads the same <code>localStorage</code> the index page
       writes to — no copy-pasting). Programme Name and Duty Type aren't tracked on the calendar, so those stay
-      editable per row after import. Importing again only adds days that aren't already in the table.
+      editable per row after import. Importing again only adds days that aren't already in the table. Runs
+      automatically whenever this page loads.
     </p>
   </div>
 
@@ -454,6 +470,12 @@
   var bulkDutyType = document.getElementById("bulkDutyType");
   var bulkDutyOther = document.getElementById("bulkDutyOther");
   var bulkApplyBtn = document.getElementById("bulkApplyBtn");
+  var syncStatusEl = document.getElementById("syncStatus");
+
+  function setSyncStatus(ok, message){
+    syncStatusEl.textContent = (ok ? "\u2713 " : "\u26A0 ") + message;
+    syncStatusEl.className = "sync-status " + (ok ? "sync-ok" : "sync-warn");
+  }
 
 
   function showToast(msg){
@@ -519,14 +541,14 @@
     var year = parseInt(periodYearInput.value, 10);
     var monthIdx = MONTHS.indexOf(monthName);
     if(monthIdx === -1 || !year){
-      showToast("Pick a Period — Month and Year first");
+      setSyncStatus(false, "Pick a Period — Month and Year first");
       renderRows();
       return;
     }
 
     var mainEntries = loadMainEntries();
     if(!mainEntries || Object.keys(mainEntries).length === 0){
-      showToast("No saved calendar data found — enter OT dates on the main index page first (same site/folder).");
+      setSyncStatus(false, "No calendar data found on this site — nothing to sync");
       renderRows();
       return;
     }
@@ -596,10 +618,10 @@
     renderRows();
 
     if(added === 0 && skipped === 0){
-      showToast(empChanged ? "Employee name synced — no OT entries found for " + monthName + " " + year : "No OT entries found on the calendar for " + monthName + " " + year);
+      setSyncStatus(false, "Synced — no OT entries found for " + monthName + " " + year + (empChanged ? " (employee name updated)" : ""));
       return;
     }
-    showToast(added + " entr" + (added === 1 ? "y" : "ies") + " imported" + (skipped ? ", " + skipped + " already here" : "") + (empChanged ? " — employee name synced" : ""));
+    setSyncStatus(true, added + " new, " + skipped + " already synced" + (empChanged ? " — employee name updated" : ""));
   }
 
   function syncExtraColumnHeaders(){
@@ -621,156 +643,203 @@
     }
   }
 
+  function buildRowTr(row){
+    var tr = document.createElement("tr");
+
+    var tdRemove = document.createElement("td");
+    var removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "row-remove-btn";
+    removeBtn.title = "Remove row";
+    removeBtn.textContent = "\u00D7";
+    removeBtn.addEventListener("click", function(){
+      rows = rows.filter(function(r){ return r.id !== row.id; });
+      saveRows(rows);
+      renderRows();
+    });
+    tdRemove.appendChild(removeBtn);
+    tr.appendChild(tdRemove);
+
+    var tdBadge = document.createElement("td");
+    var badge = document.createElement("span");
+    badge.className = "src-badge";
+    badge.title = "Imported from the main calendar";
+    if(!row.source) badge.hidden = true;
+    tdBadge.appendChild(badge);
+    tr.appendChild(tdBadge);
+
+    var tdProg = document.createElement("td");
+    tdProg.className = "duty-desc-cell";
+    var progInput = document.createElement("input");
+    progInput.type = "text";
+    progInput.placeholder = "e.g. Diploma in Business Management online course";
+    progInput.value = row.programme;
+    progInput.addEventListener("input", function(){ row.programme = progInput.value; saveRows(rows); });
+    tdProg.appendChild(progInput);
+    tr.appendChild(tdProg);
+
+    var tdMonth = document.createElement("td");
+    var monthSelect = document.createElement("select");
+    var blankOpt = document.createElement("option");
+    blankOpt.value = ""; blankOpt.textContent = "\u2014";
+    monthSelect.appendChild(blankOpt);
+    MONTHS.forEach(function(m){
+      var opt = document.createElement("option");
+      opt.value = m; opt.textContent = m;
+      if(row.month === m) opt.selected = true;
+      monthSelect.appendChild(opt);
+    });
+    monthSelect.addEventListener("change", function(){ row.month = monthSelect.value; saveRows(rows); });
+    tdMonth.appendChild(monthSelect);
+    tr.appendChild(tdMonth);
+
+    var tdDate = document.createElement("td");
+    var dateInput = document.createElement("input");
+    dateInput.type = "date";
+    dateInput.value = row.date;
+    dateInput.addEventListener("change", function(){
+      row.date = dateInput.value;
+      if(!row.month && row.date){
+        row.month = monthFromDate(row.date);
+        monthSelect.value = row.month;
+      }
+      saveRows(rows);
+      refreshOtWorkedCell();
+    });
+    tdDate.appendChild(dateInput);
+    tr.appendChild(tdDate);
+
+    var tdIn = document.createElement("td");
+    var inInput = document.createElement("input");
+    inInput.type = "time";
+    inInput.value = row.timeIn;
+    inInput.addEventListener("change", function(){ row.timeIn = inInput.value; saveRows(rows); refreshOtWorkedCell(); });
+    tdIn.appendChild(inInput);
+    tr.appendChild(tdIn);
+
+    var tdOut = document.createElement("td");
+    var outInput = document.createElement("input");
+    outInput.type = "time";
+    outInput.value = row.timeOut;
+    outInput.addEventListener("change", function(){ row.timeOut = outInput.value; saveRows(rows); refreshOtWorkedCell(); });
+    tdOut.appendChild(outInput);
+    tr.appendChild(tdOut);
+
+    var tdType = document.createElement("td");
+    var typeSelect = document.createElement("select");
+    var blankTypeOpt = document.createElement("option");
+    blankTypeOpt.value = ""; blankTypeOpt.textContent = "Select\u2026";
+    typeSelect.appendChild(blankTypeOpt);
+    DUTY_TYPES.forEach(function(t){
+      var opt = document.createElement("option");
+      opt.value = t; opt.textContent = t;
+      if(row.dutyType === t) opt.selected = true;
+      typeSelect.appendChild(opt);
+    });
+    var otherInput = document.createElement("input");
+    otherInput.type = "text";
+    otherInput.className = "duty-other-input";
+    otherInput.placeholder = "Specify\u2026";
+    otherInput.value = row.dutyOther;
+    otherInput.style.display = row.dutyType === "Other" ? "block" : "none";
+    typeSelect.addEventListener("change", function(){
+      row.dutyType = typeSelect.value;
+      otherInput.style.display = row.dutyType === "Other" ? "block" : "none";
+      saveRows(rows);
+    });
+    otherInput.addEventListener("input", function(){ row.dutyOther = otherInput.value; saveRows(rows); });
+    tdType.appendChild(typeSelect);
+    tdType.appendChild(otherInput);
+    tr.appendChild(tdType);
+
+    var otWorkedCell = null;
+    function refreshOtWorkedCell(){
+      if(otWorkedCell) otWorkedCell.textContent = formatHoursMinutes(computeWorkedMinutes(row.timeIn, row.timeOut));
+    }
+    if(colOtWorked.checked){
+      var tdOtWorked = document.createElement("td");
+      tdOtWorked.style.fontSize = "12.5px";
+      tdOtWorked.style.color = "var(--ink-soft)";
+      tdOtWorked.textContent = formatHoursMinutes(computeWorkedMinutes(row.timeIn, row.timeOut));
+      otWorkedCell = tdOtWorked;
+      tr.appendChild(tdOtWorked);
+    }
+    if(colOtApproved.checked){
+      var tdOtApproved = document.createElement("td");
+      var otApprovedInput = document.createElement("input");
+      otApprovedInput.type = "text";
+      otApprovedInput.placeholder = "e.g. 2h 30m";
+      otApprovedInput.value = row.otApproved || "";
+      otApprovedInput.addEventListener("input", function(){ row.otApproved = otApprovedInput.value; saveRows(rows); });
+      tdOtApproved.appendChild(otApprovedInput);
+      tr.appendChild(tdOtApproved);
+    }
+    if(colAmount.checked){
+      var tdAmount = document.createElement("td");
+      var amountInput = document.createElement("input");
+      amountInput.type = "text";
+      amountInput.placeholder = "e.g. Rs. 1,250.00";
+      amountInput.value = row.amount || "";
+      amountInput.addEventListener("input", function(){ row.amount = amountInput.value; saveRows(rows); });
+      tdAmount.appendChild(amountInput);
+      tr.appendChild(tdAmount);
+    }
+
+    return tr;
+  }
+
+  function totalColumnCount(){
+    return 8 + (colOtWorked.checked ? 1 : 0) + (colOtApproved.checked ? 1 : 0) + (colAmount.checked ? 1 : 0);
+  }
+
+  function appendGroupHeaderRow(label){
+    var tr = document.createElement("tr");
+    tr.className = "group-header-row";
+    var td = document.createElement("td");
+    td.colSpan = totalColumnCount();
+    td.textContent = label;
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+  }
+
   function renderRows(){
     syncExtraColumnHeaders();
     tbody.innerHTML = "";
-    emptyState.style.display = rows.length ? "none" : "block";
-    rowCountChip.textContent = rows.length + (rows.length === 1 ? " entry" : " entries");
 
-    rows.forEach(function(row){
-      var tr = document.createElement("tr");
+    var reportType = optReportType.value || "wfh";
+    var shownCount = 0;
 
-      var tdRemove = document.createElement("td");
-      var removeBtn = document.createElement("button");
-      removeBtn.type = "button";
-      removeBtn.className = "row-remove-btn";
-      removeBtn.title = "Remove row";
-      removeBtn.textContent = "\u00D7";
-      removeBtn.addEventListener("click", function(){
-        rows = rows.filter(function(r){ return r.id !== row.id; });
-        saveRows(rows);
-        renderRows();
-      });
-      tdRemove.appendChild(removeBtn);
-      tr.appendChild(tdRemove);
-
-      var tdBadge = document.createElement("td");
-      var badge = document.createElement("span");
-      badge.className = "src-badge";
-      badge.title = "Imported from the main calendar";
-      if(!row.source) badge.hidden = true;
-      tdBadge.appendChild(badge);
-      tr.appendChild(tdBadge);
-
-      var tdProg = document.createElement("td");
-      tdProg.className = "duty-desc-cell";
-      var progInput = document.createElement("input");
-      progInput.type = "text";
-      progInput.placeholder = "e.g. Diploma in Business Management online course";
-      progInput.value = row.programme;
-      progInput.addEventListener("input", function(){ row.programme = progInput.value; saveRows(rows); });
-      tdProg.appendChild(progInput);
-      tr.appendChild(tdProg);
-
-      var tdMonth = document.createElement("td");
-      var monthSelect = document.createElement("select");
-      var blankOpt = document.createElement("option");
-      blankOpt.value = ""; blankOpt.textContent = "\u2014";
-      monthSelect.appendChild(blankOpt);
-      MONTHS.forEach(function(m){
-        var opt = document.createElement("option");
-        opt.value = m; opt.textContent = m;
-        if(row.month === m) opt.selected = true;
-        monthSelect.appendChild(opt);
-      });
-      monthSelect.addEventListener("change", function(){ row.month = monthSelect.value; saveRows(rows); });
-      tdMonth.appendChild(monthSelect);
-      tr.appendChild(tdMonth);
-
-      var tdDate = document.createElement("td");
-      var dateInput = document.createElement("input");
-      dateInput.type = "date";
-      dateInput.value = row.date;
-      dateInput.addEventListener("change", function(){
-        row.date = dateInput.value;
-        if(!row.month && row.date){
-          row.month = monthFromDate(row.date);
-          monthSelect.value = row.month;
-        }
-        saveRows(rows);
-        refreshOtWorkedCell();
-      });
-      tdDate.appendChild(dateInput);
-      tr.appendChild(tdDate);
-
-      var tdIn = document.createElement("td");
-      var inInput = document.createElement("input");
-      inInput.type = "time";
-      inInput.value = row.timeIn;
-      inInput.addEventListener("change", function(){ row.timeIn = inInput.value; saveRows(rows); refreshOtWorkedCell(); });
-      tdIn.appendChild(inInput);
-      tr.appendChild(tdIn);
-
-      var tdOut = document.createElement("td");
-      var outInput = document.createElement("input");
-      outInput.type = "time";
-      outInput.value = row.timeOut;
-      outInput.addEventListener("change", function(){ row.timeOut = outInput.value; saveRows(rows); refreshOtWorkedCell(); });
-      tdOut.appendChild(outInput);
-      tr.appendChild(tdOut);
-
-      var tdType = document.createElement("td");
-      var typeSelect = document.createElement("select");
-      var blankTypeOpt = document.createElement("option");
-      blankTypeOpt.value = ""; blankTypeOpt.textContent = "Select\u2026";
-      typeSelect.appendChild(blankTypeOpt);
-      DUTY_TYPES.forEach(function(t){
-        var opt = document.createElement("option");
-        opt.value = t; opt.textContent = t;
-        if(row.dutyType === t) opt.selected = true;
-        typeSelect.appendChild(opt);
-      });
-      var otherInput = document.createElement("input");
-      otherInput.type = "text";
-      otherInput.className = "duty-other-input";
-      otherInput.placeholder = "Specify\u2026";
-      otherInput.value = row.dutyOther;
-      otherInput.style.display = row.dutyType === "Other" ? "block" : "none";
-      typeSelect.addEventListener("change", function(){
-        row.dutyType = typeSelect.value;
-        otherInput.style.display = row.dutyType === "Other" ? "block" : "none";
-        saveRows(rows);
-      });
-      otherInput.addEventListener("input", function(){ row.dutyOther = otherInput.value; saveRows(rows); });
-      tdType.appendChild(typeSelect);
-      tdType.appendChild(otherInput);
-      tr.appendChild(tdType);
-
-      var otWorkedCell = null;
-      function refreshOtWorkedCell(){
-        if(otWorkedCell) otWorkedCell.textContent = formatHoursMinutes(computeWorkedMinutes(row.timeIn, row.timeOut));
+    if(rows.length === 0){
+      emptyState.textContent = "No duty entries yet — click \"Add row\", or \"Import from calendar\" above.";
+      emptyState.style.display = "block";
+    } else if(reportType === "split"){
+      var officeRows = rows.filter(function(r){ return classifyRow(r) === "office"; });
+      var wfhRows = rows.filter(function(r){ return classifyRow(r) === "wfh"; });
+      var otherRows = rows.filter(function(r){ return classifyRow(r) === "other"; });
+      if(officeRows.length){ appendGroupHeaderRow("Office OT (" + officeRows.length + ")"); officeRows.forEach(function(r){ tbody.appendChild(buildRowTr(r)); }); }
+      if(wfhRows.length){ appendGroupHeaderRow("WFH OT (" + wfhRows.length + ")"); wfhRows.forEach(function(r){ tbody.appendChild(buildRowTr(r)); }); }
+      if(otherRows.length){ appendGroupHeaderRow("Other duties (" + otherRows.length + ")"); otherRows.forEach(function(r){ tbody.appendChild(buildRowTr(r)); }); }
+      shownCount = officeRows.length + wfhRows.length + otherRows.length;
+      emptyState.style.display = shownCount ? "none" : "block";
+    } else {
+      var visible = rowsForType(rows, reportType);
+      visible.forEach(function(r){ tbody.appendChild(buildRowTr(r)); });
+      shownCount = visible.length;
+      if(shownCount === 0){
+        emptyState.textContent = "No entries match \u201c" + optReportType.options[optReportType.selectedIndex].text + "\u201d — switch the Report type above, or add rows.";
+        emptyState.style.display = "block";
+      } else {
+        emptyState.style.display = "none";
       }
-      if(colOtWorked.checked){
-        var tdOtWorked = document.createElement("td");
-        tdOtWorked.style.fontSize = "12.5px";
-        tdOtWorked.style.color = "var(--ink-soft)";
-        tdOtWorked.textContent = formatHoursMinutes(computeWorkedMinutes(row.timeIn, row.timeOut));
-        otWorkedCell = tdOtWorked;
-        tr.appendChild(tdOtWorked);
-      }
-      if(colOtApproved.checked){
-        var tdOtApproved = document.createElement("td");
-        var otApprovedInput = document.createElement("input");
-        otApprovedInput.type = "text";
-        otApprovedInput.placeholder = "e.g. 2h 30m";
-        otApprovedInput.value = row.otApproved || "";
-        otApprovedInput.addEventListener("input", function(){ row.otApproved = otApprovedInput.value; saveRows(rows); });
-        tdOtApproved.appendChild(otApprovedInput);
-        tr.appendChild(tdOtApproved);
-      }
-      if(colAmount.checked){
-        var tdAmount = document.createElement("td");
-        var amountInput = document.createElement("input");
-        amountInput.type = "text";
-        amountInput.placeholder = "e.g. Rs. 1,250.00";
-        amountInput.value = row.amount || "";
-        amountInput.addEventListener("input", function(){ row.amount = amountInput.value; saveRows(rows); });
-        tdAmount.appendChild(amountInput);
-        tr.appendChild(tdAmount);
-      }
+    }
 
-      tbody.appendChild(tr);
-    });
+    if(rows.length === 0){
+      rowCountChip.textContent = "0 entries";
+    } else if(shownCount === rows.length){
+      rowCountChip.textContent = rows.length + (rows.length === 1 ? " entry" : " entries");
+    } else {
+      rowCountChip.textContent = shownCount + " of " + rows.length + " shown";
+    }
   }
 
   document.getElementById("importCalendarBtn").addEventListener("click", importFromCalendar);
@@ -797,7 +866,7 @@
   [optShowTitle, optShowOrg, optShowPeriod, optShowRef, optShowGenerated, optShowSignatures].forEach(function(el){
     el.addEventListener("change", saveOpts);
   });
-  optReportType.addEventListener("change", saveOpts);
+  optReportType.addEventListener("change", function(){ saveOpts(); renderRows(); });
   document.querySelectorAll('input[name="orientation"]').forEach(function(el){
     el.addEventListener("change", saveOpts);
   });
@@ -1104,11 +1173,13 @@
     applyOptsToForm(loadOpts());
     if(!optOrgName.value && importedOrgName){ /* keep field blank, PDF still falls back to importedOrgName */ }
 
+    // Always sync on open — picks up new calendar entries even if this
+    // page already has rows from a previous visit.
+    importFromCalendar();
     if(rows.length === 0){
-      importFromCalendar();
-      if(rows.length === 0) rows.push(blankRow());
+      rows.push(blankRow());
+      renderRows();
     }
-    renderRows();
   })();
 })();
 </script>
